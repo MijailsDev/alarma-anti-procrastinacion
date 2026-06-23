@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Alarma Anti-Procrastinación | UNAMAD</title>
+  <!-- Favicon y PWA Tags -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#121214">
+  <link rel="stylesheet" href="css/styles.css">
+  <!-- Google Fonts para toque estético moderno -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;800&family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <!-- Alerta Global de Pánico (Aparece cuando hay FFL vencida) -->
+  <div id="global-panic-bar" class="panic-hidden">
+    <div class="panic-content">
+      <span class="pulse-icon">🚨</span>
+      <strong>¡MÁXIMO PELIGRO!</strong> Tienes tareas con Falsa Fecha Límite superada. ¡Sube el volumen y entrega YA!
+      <button id="silence-btn">Silenciar Temporalmente</button>
+    </div>
+  </div>
+
+  <header class="app-header">
+    <div class="header-logo">
+      <span class="logo-emoji">⏱️</span>
+      <h1>Alarma Anti-Procrastinación</h1>
+    </div>
+    <span class="student-badge">UNAMAD - Ing. Sistemas</span>
+  </header>
+
+  <main class="app-container">
+    
+    <!-- Panel Izquierdo: Formulario de Nueva Tarea -->
+    <section class="panel panel-form">
+      <h2 class="panel-title">⏱️ Registrar Nueva Tarea</h2>
+      <p class="panel-subtitle">El sistema calculará automáticamente tu Falsa Fecha Límite (FFL) restando 5 horas al límite real.</p>
+      
+      <form id="task-form">
+        <div class="form-group">
+          <label for="task-title">Título de la Tarea / Laboratorio</label>
+          <input type="text" id="task-title" placeholder="Ej: Laboratorio 4 de Redes" required>
+        </div>
+
+        <div class="form-group">
+          <label for="task-desc">Descripción / Instrucciones</label>
+          <textarea id="task-desc" rows="3" placeholder="Ej: Subir el PDF con diagramas de enrutamiento OSPF..."></textarea>
+        </div>
+
+        <div class="form-group">
+          <label for="task-deadline">Fecha y Hora Límite Oficial (Aula Virtual)</label>
+          <input type="datetime-local" id="task-deadline" required>
+        </div>
+
+        <button type="submit" class="btn btn-submit">Crear Tarea con Blindaje FFL 🛡️</button>
+      </form>
+
+      <div class="config-section">
+        <h2 class="panel-title">⚙️ Margen FFL</h2>
+        <p class="panel-subtitle">Ajusta el colchón de horas que se resta a la fecha límite real para crear tu Falsa Fecha Límite.</p>
+        <div class="config-row">
+          <label for="margin-input">Horas de colchón:</label>
+          <input type="number" id="margin-input" min="1" max="72" value="5">
+          <button id="save-margin-btn" class="btn btn-config">Guardar</button>
+        </div>
+        <p id="margin-feedback" class="margin-feedback"></p>
+      </div>
+    </section>
+
+    <!-- Panel Derecho: Listado de Tareas y Estado Activo -->
+    <section class="panel panel-tasks">
+      <div class="panel-header-actions">
+        <h2 class="panel-title">📋 Mi Cronograma Estricto</h2>
+        <button id="refresh-tasks" class="btn btn-secondary">🔄 Recargar</button>
+      </div>
+      
+      <div id="tasks-list" class="tasks-grid">
+        <!-- Cargando... -->
+        <div class="loading-state">
+          <p>Conectando al backend de Alarma y cargando tareas...</p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="app-footer">
+    <p>Diseñado con lógica estricta para estudiantes de la UNAMAD. © 2026</p>
+  </footer>
+
+  <script src="js/app.js" type="module"></script>
+</body>
+</html>

@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: alarma_db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root_secure_pass_2026
+      MYSQL_DATABASE: alarma_db
+      MYSQL_USER: alarma_user
+      MYSQL_PASSWORD: alarma_pass_sec_2026
+    ports:
+      - "3307:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - alarma_network
+
+  app:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: alarma_backend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./backend:/usr/src/app
+      - /usr/src/app/node_modules
+    environment:
+      PORT: 3000
+      DB_HOST: db
+      DB_USER: alarma_user
+      DB_PASSWORD: alarma_pass_sec_2026
+      DB_NAME: alarma_db
+      NODE_ENV: development
+    depends_on:
+      db:
+        condition: service_healthy
+    command: npm run dev
+    networks:
+      - alarma_network
+
+volumes:
+  db_data:
+
+networks:
+  alarma_network:
+    driver: bridge

@@ -1,0 +1,22 @@
+{
+  "short_name": "AlarmaAntiProc",
+  "name": "Alarma Anti-Procrastinación UNAMAD",
+  "description": "Lógica estricta de alarma basada en Falsa Fecha Límite para evitar postergar entregas.",
+  "start_url": "/index.html",
+  "background_color": "#0a0a0c",
+  "theme_color": "#ef4444",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "https://img.icons8.com/color/192/alarm.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "https://img.icons8.com/color/512/alarm.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ]
+}
