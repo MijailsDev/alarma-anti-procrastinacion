@@ -79,7 +79,14 @@
         <h2 class="panel-title">📋 Mi Cronograma Estricto</h2>
         <button id="refresh-tasks" class="btn btn-secondary">🔄 Recargar</button>
       </div>
-      
+
+      <div class="legend">
+        <span class="legend-item"><span class="dot dot-safe"></span> &gt;5h</span>
+        <span class="legend-item"><span class="dot dot-warning"></span> &lt;5h</span>
+        <span class="legend-item"><span class="dot dot-danger"></span> &lt;1h</span>
+        <span class="legend-item"><span class="dot dot-panic"></span> FFL Vencida</span>
+      </div>
+
       <div id="tasks-list" class="tasks-grid">
         <!-- Cargando... -->
         <div class="loading-state">

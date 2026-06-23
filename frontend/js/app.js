@@ -9,6 +9,7 @@ let silenceTimeoutId = null;
 
 // Control de notificaciones nativas
 const notifiedTasks = new Set();
+let notificationsEnabled = false;
 
 // Inicializar el contexto de audio en la primera interacción del usuario (política de navegadores)
 function initAudio() {
@@ -182,7 +183,13 @@ function renderTasks(tareas) {
   }
 }
 
-// Tarjeta para tarea activa (Pendiente / En Progreso)
+const ALERT_LABELS = {
+  'Bajo': 'Estado: Óptimo',
+  'Moderado': 'Atención Requerida',
+  'Alto (Crítico)': 'Prioridad Máxima',
+  '¡MÁXIMO PELIGRO (CRÍTICO)!': 'FFL Vencida — Acción Inmediata'
+};
+
 function renderActiveCard(tarea) {
   let borderClass = 'border-safe';
   let alarmClass = 'alarm-safe';
@@ -216,6 +223,8 @@ function renderActiveCard(tarea) {
     `;
   }
 
+  const alertLabel = ALERT_LABELS[tarea.alarma.nivel] || tarea.alarma.nivel;
+
   return `
     <div class="task-card ${borderClass}">
       <div class="task-header">
@@ -237,8 +246,7 @@ function renderActiveCard(tarea) {
         </div>
       </div>
       <div class="task-alarm-info ${alarmClass}">
-        <span>🚨 Nivel de Alerta: <strong>${tarea.alarma.nivel}</strong></span>
-        <p style="font-size: 0.75rem; font-weight: 400; margin-top: 2px;">${tarea.alarma.mensaje}</p>
+        <span>${alertLabel}</span>
       </div>
       <div class="task-actions">
         ${actionButtons}
@@ -293,6 +301,11 @@ async function createTask(e) {
     return;
   }
 
+  // Convertir la hora local del input (UTC-5 Perú) a ISO UTC
+  // para evitar el timezone bug al guardar en MySQL (Docker corre en UTC)
+  const localDate = new Date(fechaLimiteReal);
+  const fechaUtc = localDate.toISOString();
+
   try {
     const res = await fetch(`${API_BASE}/tareas`, {
       method: 'POST',
@@ -300,7 +313,7 @@ async function createTask(e) {
       body: JSON.stringify({
         titulo,
         descripcion,
-        fecha_limite_real: fechaLimiteReal
+        fecha_limite_real: fechaUtc
       })
     });
 
@@ -465,15 +478,20 @@ window.deleteTask = async function(id) {
   }
 };
 
-// Solicitar permiso de notificaciones nativas del sistema operativo
+// Alternar activación/desactivación de notificaciones nativas
 async function requestNotificationPermission() {
-  if (!('Notification' in window)) {
-    alert('Este navegador no soporta notificaciones de escritorio.');
+  const btn = document.getElementById('notif-permit-btn');
+
+  // Si ya están activadas, desactivar
+  if (notificationsEnabled) {
+    notificationsEnabled = false;
+    btn.textContent = '🔔';
+    btn.classList.remove('notif-active');
     return;
   }
 
-  if (Notification.permission === 'granted') {
-    alert('✅ Las notificaciones ya están activadas.');
+  if (!('Notification' in window)) {
+    alert('Este navegador no soporta notificaciones de escritorio.');
     return;
   }
 
@@ -482,18 +500,25 @@ async function requestNotificationPermission() {
     return;
   }
 
-  const permission = await Notification.requestPermission();
-  if (permission === 'granted') {
-    const btn = document.getElementById('notif-permit-btn');
+  if (Notification.permission === 'granted') {
+    notificationsEnabled = true;
     btn.textContent = '🔔 Activadas';
     btn.classList.add('notif-active');
-    alert('✅ Notificaciones activadas. Recibirás alertas cuando una tarea entre en estado crítico.');
+    return;
+  }
+
+  // Solicitar permiso por primera vez
+  const permission = await Notification.requestPermission();
+  if (permission === 'granted') {
+    notificationsEnabled = true;
+    btn.textContent = '🔔 Activadas';
+    btn.classList.add('notif-active');
   }
 }
 
 // Enviar notificación nativa al sistema operativo
 function sendNativeNotification(titulo, tareaId) {
-  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  if (!notificationsEnabled || !('Notification' in window) || Notification.permission !== 'granted') return;
   if (notifiedTasks.has(tareaId)) return;
 
   notifiedTasks.add(tareaId);

@@ -41,6 +41,7 @@ services:
       DB_PASSWORD: alarma_pass_sec_2026
       DB_NAME: alarma_db
       NODE_ENV: development
+      TZ: America/Lima
     depends_on:
       db:
         condition: service_healthy
