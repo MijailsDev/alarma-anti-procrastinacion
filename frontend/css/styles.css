@@ -131,6 +131,33 @@ body {
   color: var(--accent-color);
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.btn-notif-permit {
+  background: none;
+  border: 1px solid var(--border-color);
+  cursor: pointer;
+  font-size: 1.1rem;
+  padding: 6px 8px;
+  border-radius: 8px;
+  transition: all 0.2s;
+  line-height: 1;
+}
+
+.btn-notif-permit:hover {
+  background-color: var(--bg-tertiary);
+  border-color: var(--accent-color);
+}
+
+.btn-notif-permit.notif-active {
+  border-color: var(--color-safe);
+  background-color: rgba(16, 185, 129, 0.1);
+}
+
 /* Contenedor Principal */
 .app-container {
   max-width: 1200px;
@@ -481,6 +508,67 @@ body {
   text-align: center;
   padding: 40px 20px;
   color: var(--text-secondary);
+}
+
+/* Historial de Tareas Completadas */
+.history-section {
+  max-width: 1200px;
+  margin: 20px auto;
+  padding: 0 20px;
+}
+
+.history-details {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.history-summary {
+  padding: 16px 24px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: background-color 0.2s;
+}
+
+.history-summary:hover {
+  background-color: var(--bg-tertiary);
+}
+
+.history-summary::-webkit-details-marker {
+  color: var(--text-secondary);
+}
+
+.history-count {
+  background-color: var(--accent-color);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 12px;
+  min-width: 22px;
+  text-align: center;
+}
+
+.history-details[open] .history-summary {
+  border-bottom: 1px solid var(--border-color);
+}
+
+#history-list {
+  padding: 16px 24px;
+}
+
+#history-list .task-card {
+  opacity: 0.85;
+}
+
+#history-list .task-card .task-actions span {
+  color: var(--color-safe) !important;
 }
 
 /* Pie de página */

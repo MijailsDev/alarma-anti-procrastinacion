@@ -29,7 +29,10 @@
       <span class="logo-emoji">⏱️</span>
       <h1>Alarma Anti-Procrastinación</h1>
     </div>
-    <span class="student-badge">UNAMAD - Ing. Sistemas</span>
+    <div class="header-actions">
+      <span class="student-badge">UNAMAD - Ing. Sistemas</span>
+      <button id="notif-permit-btn" class="btn-notif-permit" title="Activar notificaciones del sistema">🔔</button>
+    </div>
   </header>
 
   <main class="app-container">
@@ -86,6 +89,16 @@
     </section>
 
   </main>
+
+  <section class="history-section">
+    <details class="history-details">
+      <summary class="history-summary">
+        📜 Historial de Tareas Completadas
+        <span id="history-count" class="history-count">0</span>
+      </summary>
+      <div id="history-list" class="tasks-grid"></div>
+    </details>
+  </section>
 
   <footer class="app-footer">
     <p>Diseñado con lógica estricta para estudiantes de la UNAMAD. © 2026</p>

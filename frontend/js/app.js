@@ -7,6 +7,9 @@ let alarmIntervalId = null;
 let isSilenced = false;
 let silenceTimeoutId = null;
 
+// Control de notificaciones nativas
+const notifiedTasks = new Set();
+
 // Inicializar el contexto de audio en la primera interacción del usuario (política de navegadores)
 function initAudio() {
   if (!audioCtx) {
@@ -93,6 +96,8 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('task-form').addEventListener('submit', createTask);
   document.getElementById('save-margin-btn').addEventListener('click', updateMarginHours);
   
+  document.getElementById('notif-permit-btn').addEventListener('click', requestNotificationPermission);
+  
   document.getElementById('silence-btn').addEventListener('click', () => {
     initAudio();
     isSilenced = true;
@@ -148,94 +153,130 @@ async function fetchTasks() {
   }
 }
 
-// Renderizar las tarjetas de tareas en el Grid
+// Renderizar tarjetas separando activas de completadas
 function renderTasks(tareas) {
   const container = document.getElementById('tasks-list');
-  
-  if (tareas.length === 0) {
+  const historyContainer = document.getElementById('history-list');
+  const historyCount = document.getElementById('history-count');
+
+  const activas = tareas.filter(t => t.estado !== 'Enviada');
+  const completadas = tareas.filter(t => t.estado === 'Enviada');
+
+  historyCount.textContent = completadas.length;
+
+  if (activas.length === 0) {
     container.innerHTML = `
       <div class="empty-state">
-        <p>🎉 ¡Excelente! No tienes tareas registradas actualmente.</p>
-        <p style="font-size: 0.85rem; margin-top: 10px;">Añade una tarea a la izquierda para activar el escudo anti-procrastinación.</p>
+        <p>🎉 ¡Excelente! No tienes tareas pendientes actualmente.</p>
+        <p style="font-size: 0.85rem; margin-top: 10px;">Añade una nueva tarea a la izquierda para activar el escudo anti-procrastinación.</p>
       </div>
     `;
-    return;
+  } else {
+    container.innerHTML = activas.map(tarea => renderActiveCard(tarea)).join('');
   }
 
-  container.innerHTML = tareas.map(tarea => {
-    // Determinar clase según estado de alarma
-    let borderClass = 'border-safe';
-    let alarmClass = 'alarm-safe';
-    
-    if (tarea.estado !== 'Enviada') {
-      if (tarea.alarma.nivel === '¡MÁXIMO PELIGRO (CRÍTICO)!') {
-        borderClass = 'border-panic';
-        alarmClass = 'alarm-panic';
-      } else if (tarea.alarma.nivel === 'Alto (Crítico)') {
-        borderClass = 'border-danger';
-        alarmClass = 'alarm-danger';
-      } else if (tarea.alarma.nivel === 'Moderado') {
-        borderClass = 'border-warning';
-        alarmClass = 'alarm-warning';
-      }
-    }
+  if (completadas.length === 0) {
+    historyContainer.innerHTML = `<div class="empty-state"><p>Aún no hay tareas completadas.</p></div>`;
+  } else {
+    historyContainer.innerHTML = completadas.map(tarea => renderCompletedCard(tarea)).join('');
+  }
+}
 
-    // Formatear fechas legibles
-    const fReal = new Date(tarea.fecha_limite_real).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' });
-    const fFalsa = new Date(tarea.fecha_limite_falsa).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' });
+// Tarjeta para tarea activa (Pendiente / En Progreso)
+function renderActiveCard(tarea) {
+  let borderClass = 'border-safe';
+  let alarmClass = 'alarm-safe';
 
-    // Renderizado condicional de botones según Máquina de Estados Estricta
-    let actionButtons = '';
-    if (tarea.estado === 'Pendiente') {
-      actionButtons = `
-        <button class="btn-action btn-start" onclick="updateTaskStatus(${tarea.id}, 'En Progreso')">
-          ⚡ Empezar Trabajo (Pendiente ➔ En Progreso)
-        </button>
-      `;
-    } else if (tarea.estado === 'En Progreso') {
-      actionButtons = `
-        <button class="btn-action btn-submit-task" onclick="updateTaskStatus(${tarea.id}, 'En Enviada')">
-          📤 Entregar al Aula (En Progreso ➔ Enviada)
-        </button>
-      `;
-    } else {
-      actionButtons = `<span style="color: #10b981; font-weight: 600; font-size: 0.85rem; text-align: center; width: 100%;">🛡️ Tarea entregada con éxito a tiempo. ¡Excelente!</span>`;
-    }
+  if (tarea.alarma.nivel === '¡MÁXIMO PELIGRO (CRÍTICO)!') {
+    borderClass = 'border-panic';
+    alarmClass = 'alarm-panic';
+  } else if (tarea.alarma.nivel === 'Alto (Crítico)') {
+    borderClass = 'border-danger';
+    alarmClass = 'alarm-danger';
+  } else if (tarea.alarma.nivel === 'Moderado') {
+    borderClass = 'border-warning';
+    alarmClass = 'alarm-warning';
+  }
 
-    return `
-      <div class="task-card ${borderClass}">
-        <div class="task-header">
-          <h3 class="task-title">${escapeHTML(tarea.titulo)}</h3>
-          <div class="task-header-right">
-            <span class="task-status ${tarea.estado.toLowerCase().replace(' ', '-')}">${tarea.estado}</span>
-            <button class="btn-delete" onclick="deleteTask(${tarea.id})" title="Eliminar tarea">🗑️</button>
-          </div>
-        </div>
-        
-        <p class="task-desc">${escapeHTML(tarea.descripcion || 'Sin descripción.')}</p>
-        
-        <div class="task-dates">
-          <div class="date-block">
-            <strong>Límite Aula Virtual:</strong>
-            <span>${fReal}</span>
-          </div>
-          <div class="date-block" style="color: var(--color-warning);">
-            <strong>Falsa Fecha Límite (FFL):</strong>
-            <span>${fFalsa}</span>
-          </div>
-        </div>
+  const fReal = new Date(tarea.fecha_limite_real).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' });
+  const fFalsa = new Date(tarea.fecha_limite_falsa).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' });
 
-        <div class="task-alarm-info ${alarmClass}">
-          <span>🚨 Nivel de Alerta: <strong>${tarea.alarma.nivel}</strong></span>
-          <p style="font-size: 0.75rem; font-weight: 400; margin-top: 2px;">${tarea.alarma.mensaje}</p>
-        </div>
+  let actionButtons = '';
+  if (tarea.estado === 'Pendiente') {
+    actionButtons = `
+      <button class="btn-action btn-start" onclick="updateTaskStatus(${tarea.id}, 'En Progreso')">
+        ⚡ Empezar Trabajo (Pendiente ➔ En Progreso)
+      </button>
+    `;
+  } else if (tarea.estado === 'En Progreso') {
+    actionButtons = `
+      <button class="btn-action btn-submit-task" onclick="updateTaskStatus(${tarea.id}, 'En Enviada')">
+        📤 Entregar al Aula (En Progreso ➔ Enviada)
+      </button>
+    `;
+  }
 
-        <div class="task-actions">
-          ${actionButtons}
+  return `
+    <div class="task-card ${borderClass}">
+      <div class="task-header">
+        <h3 class="task-title">${escapeHTML(tarea.titulo)}</h3>
+        <div class="task-header-right">
+          <span class="task-status ${tarea.estado.toLowerCase().replace(' ', '-')}">${tarea.estado}</span>
+          <button class="btn-delete" onclick="deleteTask(${tarea.id})" title="Eliminar tarea">🗑️</button>
         </div>
       </div>
-    `;
-  }).join('');
+      <p class="task-desc">${escapeHTML(tarea.descripcion || 'Sin descripción.')}</p>
+      <div class="task-dates">
+        <div class="date-block">
+          <strong>Límite Aula Virtual:</strong>
+          <span>${fReal}</span>
+        </div>
+        <div class="date-block" style="color: var(--color-warning);">
+          <strong>Falsa Fecha Límite (FFL):</strong>
+          <span>${fFalsa}</span>
+        </div>
+      </div>
+      <div class="task-alarm-info ${alarmClass}">
+        <span>🚨 Nivel de Alerta: <strong>${tarea.alarma.nivel}</strong></span>
+        <p style="font-size: 0.75rem; font-weight: 400; margin-top: 2px;">${tarea.alarma.mensaje}</p>
+      </div>
+      <div class="task-actions">
+        ${actionButtons}
+      </div>
+    </div>
+  `;
+}
+
+// Tarjeta resumida para tarea completada
+function renderCompletedCard(tarea) {
+  const fReal = new Date(tarea.fecha_limite_real).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' });
+  const fFalsa = new Date(tarea.fecha_limite_falsa).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' });
+
+  return `
+    <div class="task-card border-safe">
+      <div class="task-header">
+        <h3 class="task-title">${escapeHTML(tarea.titulo)}</h3>
+        <div class="task-header-right">
+          <span class="task-status enviada">${tarea.estado}</span>
+          <button class="btn-delete" onclick="deleteTask(${tarea.id})" title="Eliminar tarea">🗑️</button>
+        </div>
+      </div>
+      <p class="task-desc">${escapeHTML(tarea.descripcion || 'Sin descripción.')}</p>
+      <div class="task-dates">
+        <div class="date-block">
+          <strong>Límite Aula Virtual:</strong>
+          <span>${fReal}</span>
+        </div>
+        <div class="date-block" style="color: var(--color-warning);">
+          <strong>Falsa Fecha Límite (FFL):</strong>
+          <span>${fFalsa}</span>
+        </div>
+      </div>
+      <div class="task-actions">
+        <span style="color: #10b981; font-weight: 600; font-size: 0.85rem; text-align: center; width: 100%;">🛡️ Tarea entregada con éxito a tiempo. ¡Excelente!</span>
+      </div>
+    </div>
+  `;
 }
 
 // Crear una tarea nueva mediante el formulario
@@ -307,7 +348,7 @@ window.updateTaskStatus = async function(id, nuevoEstado) {
   }
 };
 
-// Evaluar el nivel general de alarmas activas en la app para disparar alarmas sonoras e interfaz de pánico
+// Evaluar el nivel general de alarmas activas en la app para disparar alarmas sonoras, interfaz de pánico y notificaciones nativas
 function evaluateGlobalAlarms(tareas) {
   if (isSilenced) return;
 
@@ -321,8 +362,17 @@ function evaluateGlobalAlarms(tareas) {
 
   activas.forEach(t => {
     const nivelActual = t.alarma.nivel;
+
     if (jerarquia[nivelActual] > jerarquia[maxAlarma]) {
       maxAlarma = nivelActual;
+    }
+
+    // Disparar notificación nativa si la tarea entra en estado crítico o máximo peligro
+    if (nivelActual === 'Alto (Crítico)' || nivelActual === '¡MÁXIMO PELIGRO (CRÍTICO)!') {
+      sendNativeNotification(
+        `⚠️ "${t.titulo}" — ${nivelActual}. Te quedan menos de 1 hora para tu Falsa Fecha Límite. ¡Entrega YA!`,
+        t.id
+      );
     }
   });
 
@@ -414,6 +464,58 @@ window.deleteTask = async function(id) {
     alert(`❌ Error al eliminar la tarea: ${err.message}`);
   }
 };
+
+// Solicitar permiso de notificaciones nativas del sistema operativo
+async function requestNotificationPermission() {
+  if (!('Notification' in window)) {
+    alert('Este navegador no soporta notificaciones de escritorio.');
+    return;
+  }
+
+  if (Notification.permission === 'granted') {
+    alert('✅ Las notificaciones ya están activadas.');
+    return;
+  }
+
+  if (Notification.permission === 'denied') {
+    alert('❌ Las notificaciones están bloqueadas. Actívalas desde la configuración del navegador.');
+    return;
+  }
+
+  const permission = await Notification.requestPermission();
+  if (permission === 'granted') {
+    const btn = document.getElementById('notif-permit-btn');
+    btn.textContent = '🔔 Activadas';
+    btn.classList.add('notif-active');
+    alert('✅ Notificaciones activadas. Recibirás alertas cuando una tarea entre en estado crítico.');
+  }
+}
+
+// Enviar notificación nativa al sistema operativo
+function sendNativeNotification(titulo, tareaId) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  if (notifiedTasks.has(tareaId)) return;
+
+  notifiedTasks.add(tareaId);
+
+  try {
+    const notif = new Notification('🚨 Alarma Anti-Procrastinación', {
+      body: titulo,
+      icon: 'https://img.icons8.com/color/192/alarm.png',
+      badge: 'https://img.icons8.com/color/192/alarm.png',
+      tag: `critico-${tareaId}`,
+      vibrate: [300, 100, 300],
+      requireInteraction: true
+    });
+
+    notif.addEventListener('click', () => {
+      window.focus();
+      notif.close();
+    });
+  } catch (err) {
+    console.warn('No se pudo enviar la notificación nativa:', err.message);
+  }
+}
 
 // Escapar cadenas HTML para evitar vulnerabilidades XSS en las vistas
 function escapeHTML(str) {

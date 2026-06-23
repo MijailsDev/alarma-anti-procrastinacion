@@ -1,5 +1,5 @@
-const CACHE_NAME = 'alarma-anti-proc-v1';
-const ASSETS = [
+const CACHE_NAME = 'alarma-anti-proc-v2';
+const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/css/styles.css',
@@ -7,65 +7,54 @@ const ASSETS = [
   '/manifest.json'
 ];
 
-// Instalar Service Worker y almacenar recursos en caché
 self.addEventListener('install', (e) => {
   e.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log('📦 [Service Worker] Almacenando recursos estáticos en caché');
-      return cache.addAll(ASSETS);
+      console.log('[SW] Almacenando recursos estáticos en caché');
+      return cache.addAll(STATIC_ASSETS);
     })
   );
   self.skipWaiting();
 });
 
-// Activar y limpiar cachés antiguas
 self.addEventListener('activate', (e) => {
   e.waitUntil(
-    caches.keys().then((keys) => {
-      return Promise.all(
+    caches.keys().then((keys) =>
+      Promise.all(
         keys.map((key) => {
           if (key !== CACHE_NAME) {
-            console.log('🧹 [Service Worker] Eliminando caché antigua:', key);
+            console.log('[SW] Eliminando caché antigua:', key);
             return caches.delete(key);
           }
         })
-      );
-    })
+      )
+    )
   );
   self.clients.claim();
 });
 
-// Interceptar peticiones para servir desde caché de manera preferente (offline first para los recursos locales)
 self.addEventListener('fetch', (e) => {
-  // Ignorar peticiones a la API del backend para que siempre vayan a la red en vivo
-  if (e.request.url.includes('/api/')) {
-    return;
-  }
+  if (e.request.url.includes('/api/')) return;
 
   e.respondWith(
-    caches.match(e.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        return cachedResponse;
-      }
-      return fetch(e.request).then((networkResponse) => {
-        return networkResponse;
-      });
-    }).catch(() => {
-      // Si falla y es una página, podríamos devolver un fallback
-    })
+    fetch(e.request)
+      .then((response) => {
+        const cloned = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(e.request, cloned));
+        return response;
+      })
+      .catch(() => caches.match(e.request))
   );
 });
 
-// --- BASE ARQUITECTÓNICA PARA NOTIFICACIONES PUSH AGRESIVAS ---
-// Este evento escuchará señales del servidor (FCM/WebPush) para disparar avisos intrusivos
 self.addEventListener('push', (e) => {
   let data = {
     title: '🚨 ¡ALARMA DE ENTREGA CRÍTICA!',
     body: 'Has superado tu Falsa Fecha Límite. ¡Entrega de inmediato al aula virtual!',
     icon: 'https://img.icons8.com/color/192/alarm.png',
-    vibrate: [300, 100, 300, 100, 500, 100, 500], // Patrón de vibración agresiva en móviles
+    vibrate: [300, 100, 300, 100, 500, 100, 500],
     tag: 'alarma-agresiva',
-    requireInteraction: true // Mantiene la notificación visible hasta que el usuario interactúe
+    requireInteraction: true
   };
 
   if (e.data) {
@@ -93,7 +82,6 @@ self.addEventListener('push', (e) => {
   );
 });
 
-// Manejar clics en notificaciones
 self.addEventListener('notificationclick', (e) => {
   e.notification.close();
 
