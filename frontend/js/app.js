@@ -115,11 +115,20 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 180000); // 3 minutos
   });
 
+  // Iniciar cuenta regresiva en vivo (actualiza cada 30s)
+  startCountdown();
+
   // Activar audio en el primer click de la pantalla
   document.body.addEventListener('click', () => {
     initAudio();
   }, { once: true });
 });
+
+function startCountdown() {
+  if (countdownIntervalId) clearInterval(countdownIntervalId);
+  updateAllCountdowns();
+  countdownIntervalId = setInterval(updateAllCountdowns, 30000);
+}
 
 // Registrar Service Worker de PWA
 async function registerServiceWorker() {
@@ -144,7 +153,9 @@ async function fetchTasks() {
     const tareas = await res.json();
     renderTasks(tareas);
     evaluateGlobalAlarms(tareas);
+    updateAllCountdowns();
   } catch (err) {
+    console.error('fetchTasks error:', err);
     container.innerHTML = `
       <div class="empty-state">
         <p style="color: #ef4444;">❌ No se pudo conectar con el servidor Express backend.</p>
@@ -183,6 +194,38 @@ function renderTasks(tareas) {
   }
 }
 
+let countdownIntervalId = null;
+
+let toastTimeoutId = null;
+
+function showToast(message, type = 'info', duration = 3500) {
+  if (toastTimeoutId) {
+    clearTimeout(toastTimeoutId);
+    const existing = document.querySelector('.toast');
+    if (existing) existing.remove();
+  }
+
+  let container = document.getElementById('toast-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'toast-container';
+    document.body.appendChild(container);
+  }
+
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
+  toast.textContent = message;
+  container.appendChild(toast);
+
+  requestAnimationFrame(() => toast.classList.add('toast-visible'));
+
+  toastTimeoutId = setTimeout(() => {
+    toast.classList.remove('toast-visible');
+    toast.addEventListener('transitionend', () => toast.remove(), { once: true });
+    toastTimeoutId = null;
+  }, duration);
+}
+
 const ALERT_LABELS = {
   'Bajo': 'Estado: Óptimo',
   'Moderado': 'Atención Requerida',
@@ -218,12 +261,13 @@ function renderActiveCard(tarea) {
   } else if (tarea.estado === 'En Progreso') {
     actionButtons = `
       <button class="btn-action btn-submit-task" onclick="updateTaskStatus(${tarea.id}, 'En Enviada')">
-        📤 Entregar al Aula (En Progreso ➔ Enviada)
+        📤 Marcar como Entregado
       </button>
     `;
   }
 
   const alertLabel = ALERT_LABELS[tarea.alarma.nivel] || tarea.alarma.nivel;
+  const countdownHtml = renderCountdown(tarea.id, tarea.fecha_limite_falsa);
 
   return `
     <div class="task-card ${borderClass}">
@@ -237,7 +281,7 @@ function renderActiveCard(tarea) {
       <p class="task-desc">${escapeHTML(tarea.descripcion || 'Sin descripción.')}</p>
       <div class="task-dates">
         <div class="date-block">
-          <strong>Límite Aula Virtual:</strong>
+          <strong>Límite Oficial:</strong>
           <span>${fReal}</span>
         </div>
         <div class="date-block" style="color: var(--color-warning);">
@@ -245,6 +289,7 @@ function renderActiveCard(tarea) {
           <span>${fFalsa}</span>
         </div>
       </div>
+      <div id="countdown-${tarea.id}" class="task-countdown" data-ffl="${tarea.fecha_limite_falsa}">${countdownHtml}</div>
       <div class="task-alarm-info ${alarmClass}">
         <span>${alertLabel}</span>
       </div>
@@ -253,6 +298,51 @@ function renderActiveCard(tarea) {
       </div>
     </div>
   `;
+}
+
+function formatCountdown(fechaLimiteFalsa) {
+  const ffl = new Date(fechaLimiteFalsa);
+  const ahora = new Date();
+  const diffMs = ffl - ahora;
+  const absMs = Math.abs(diffMs);
+  const totalMinutos = Math.floor(absMs / 60000);
+  const horas = Math.floor(totalMinutos / 60);
+  const minutos = totalMinutos % 60;
+  const dias = Math.floor(horas / 24);
+  const horasResto = horas % 24;
+
+  if (diffMs > 0) {
+    if (dias > 0) {
+      return `${dias}d ${String(horasResto).padStart(2, '0')}h ${String(minutos).padStart(2, '0')}m`;
+    }
+    return `${String(horas).padStart(2, '0')}h ${String(minutos).padStart(2, '0')}m`;
+  }
+
+  return `${String(horas).padStart(2, '0')}h ${String(minutos).padStart(2, '0')}m`;
+}
+
+function renderCountdown(id, fechaLimiteFalsa) {
+  const ffl = new Date(fechaLimiteFalsa);
+  const ahora = new Date();
+  const diffMs = ffl - ahora;
+
+  if (diffMs > 0) {
+    return `⏳ Faltan ${formatCountdown(fechaLimiteFalsa)}`;
+  }
+
+  return `⚠️ Vencida ${formatCountdown(fechaLimiteFalsa)}`;
+}
+
+function updateAllCountdowns() {
+  try {
+    document.querySelectorAll('[id^="countdown-"]').forEach(el => {
+      const ffl = el.dataset.ffl;
+      if (!ffl) return;
+      el.textContent = renderCountdown(el.id.replace('countdown-', ''), ffl);
+    });
+  } catch (err) {
+    console.error('Error actualizando countdowns:', err);
+  }
 }
 
 // Tarjeta resumida para tarea completada
@@ -272,7 +362,7 @@ function renderCompletedCard(tarea) {
       <p class="task-desc">${escapeHTML(tarea.descripcion || 'Sin descripción.')}</p>
       <div class="task-dates">
         <div class="date-block">
-          <strong>Límite Aula Virtual:</strong>
+          <strong>Límite Oficial:</strong>
           <span>${fReal}</span>
         </div>
         <div class="date-block" style="color: var(--color-warning);">
@@ -297,7 +387,7 @@ async function createTask(e) {
   const fechaLimiteReal = document.getElementById('task-deadline').value;
 
   if (!titulo || !fechaLimiteReal) {
-    alert('Por favor, rellena todos los campos obligatorios.');
+    showToast('Completa todos los campos obligatorios.', 'error');
     return;
   }
 
@@ -325,9 +415,9 @@ async function createTask(e) {
     // Resetear formulario y recargar tareas
     document.getElementById('task-form').reset();
     fetchTasks();
-    alert('🎉 ¡Tarea creada! Se ha calculado la Falsa Fecha Límite (FFL) protegiéndote contra la procrastinación.');
+    showToast('🎉 Tarea creada con FFL calculada.', 'success');
   } catch (err) {
-    alert(`❌ Error al crear la tarea: ${err.message}`);
+    showToast(`Error: ${err.message}`, 'error');
   }
 }
 
@@ -349,15 +439,14 @@ window.updateTaskStatus = async function(id, nuevoEstado) {
 
     if (!res.ok) {
       // Mostrar el error estricto de la máquina de estados
-      alert(`⚠️ ERROR DE MÁQUINA DE ESTADOS:\n\n${data.error}\n\nDetalles: ${data.regla}`);
+      showToast(`⚠️ ${data.error}`, 'error');
       return;
     }
 
-    // Recargar tareas para reflejar la actualización
     fetchTasks();
-    alert(`✅ ¡Estado actualizado! ${data.mensaje}`);
+    showToast(`✅ ${data.mensaje}`, 'success');
   } catch (err) {
-    alert(`❌ Error al actualizar el estado: ${err.message}`);
+    showToast(`Error: ${err.message}`, 'error');
   }
 };
 
@@ -474,7 +563,7 @@ window.deleteTask = async function(id) {
 
     fetchTasks();
   } catch (err) {
-    alert(`❌ Error al eliminar la tarea: ${err.message}`);
+    showToast(`Error al eliminar: ${err.message}`, 'error');
   }
 };
 
@@ -491,12 +580,12 @@ async function requestNotificationPermission() {
   }
 
   if (!('Notification' in window)) {
-    alert('Este navegador no soporta notificaciones de escritorio.');
+    showToast('Este navegador no soporta notificaciones.', 'error');
     return;
   }
 
   if (Notification.permission === 'denied') {
-    alert('❌ Las notificaciones están bloqueadas. Actívalas desde la configuración del navegador.');
+    showToast('Notificaciones bloqueadas en el navegador.', 'error');
     return;
   }
 
@@ -526,8 +615,8 @@ function sendNativeNotification(titulo, tareaId) {
   try {
     const notif = new Notification('🚨 Alarma Anti-Procrastinación', {
       body: titulo,
-      icon: 'https://img.icons8.com/color/192/alarm.png',
-      badge: 'https://img.icons8.com/color/192/alarm.png',
+      icon: '/icons/icon-192.svg',
+      badge: '/icons/icon-192.svg',
       tag: `critico-${tareaId}`,
       vibrate: [300, 100, 300],
       requireInteraction: true

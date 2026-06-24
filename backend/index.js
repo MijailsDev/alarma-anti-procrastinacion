@@ -267,7 +267,18 @@ app.put('/api/configuracion', async (req, res) => {
 
   try {
     await pool.query('UPDATE usuarios SET margen_horas = ? WHERE id = ?', [margen_horas, usuarioId]);
-    res.json({ mensaje: `Margen FFL actualizado a ${margen_horas} horas.`, margen_horas });
+
+    const [result] = await pool.query(
+      `UPDATE tareas SET fecha_limite_falsa = DATE_SUB(fecha_limite_real, INTERVAL ? HOUR)
+       WHERE usuario_id = ? AND estado != 'Enviada'`,
+      [margen_horas, usuarioId]
+    );
+
+    res.json({
+      mensaje: `Margen FFL actualizado a ${margen_horas} horas.`,
+      margen_horas,
+      tareas_actualizadas: result.affectedRows
+    });
   } catch (err) {
     res.status(500).json({ error: 'Error al actualizar configuración', detalles: err.message });
   }

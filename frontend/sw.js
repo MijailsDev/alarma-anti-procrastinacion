@@ -4,7 +4,9 @@ const STATIC_ASSETS = [
   '/index.html',
   '/css/styles.css',
   '/js/app.js',
-  '/manifest.json'
+  '/manifest.json',
+  '/icons/icon-192.svg',
+  '/icons/icon-512.svg'
 ];
 
 self.addEventListener('install', (e) => {
@@ -51,7 +53,7 @@ self.addEventListener('push', (e) => {
   let data = {
     title: '🚨 ¡ALARMA DE ENTREGA CRÍTICA!',
     body: 'Has superado tu Falsa Fecha Límite. ¡Entrega de inmediato al aula virtual!',
-    icon: 'https://img.icons8.com/color/192/alarm.png',
+    icon: '/icons/icon-192.svg',
     vibrate: [300, 100, 300, 100, 500, 100, 500],
     tag: 'alarma-agresiva',
     requireInteraction: true

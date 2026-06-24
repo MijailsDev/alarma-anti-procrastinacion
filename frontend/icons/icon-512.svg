@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="64" fill="#121216"/>
+  <circle cx="256" cy="220" r="120" fill="none" stroke="#ef4444" stroke-width="12"/>
+  <circle cx="256" cy="220" r="10" fill="#ef4444"/>
+  <line x1="256" y1="220" x2="256" y2="164" stroke="#ef4444" stroke-width="10" stroke-linecap="round"/>
+  <line x1="256" y1="220" x2="290" y2="240" stroke="#ef4444" stroke-width="10" stroke-linecap="round"/>
+  <path d="M256 390 Q340 390 360 340" fill="none" stroke="#fbbf24" stroke-width="8" stroke-linecap="round"/>
+  <path d="M256 390 Q172 390 152 340" fill="none" stroke="#fbbf24" stroke-width="8" stroke-linecap="round"/>
+  <line x1="160" y1="110" x2="120" y2="70" stroke="#ef4444" stroke-width="8" stroke-linecap="round"/>
+  <line x1="352" y1="110" x2="392" y2="70" stroke="#ef4444" stroke-width="8" stroke-linecap="round"/>
+  <text x="256" y="480" text-anchor="middle" font-family="sans-serif" font-size="36" font-weight="700" fill="#9ca3af">Alarma</text>
+</svg>

@@ -418,6 +418,18 @@ body {
   color: var(--text-primary);
 }
 
+.task-countdown {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-align: center;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: #0f0f16;
+  color: var(--text-primary);
+  letter-spacing: 0.5px;
+}
+
 .task-alarm-info {
   font-size: 0.8rem;
   font-weight: 700;
@@ -658,6 +670,54 @@ body {
 
 #history-list .task-card .task-actions span {
   color: #34d399 !important;
+}
+
+#toast-container {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.toast {
+  padding: 12px 20px;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #fff;
+  opacity: 0;
+  transform: translateY(16px);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  pointer-events: auto;
+  max-width: 420px;
+  text-align: center;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+.toast-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.toast-success {
+  background-color: #065f46;
+  border: 1px solid #10b981;
+}
+
+.toast-error {
+  background-color: #7f1d1d;
+  border: 1px solid #ef4444;
+}
+
+.toast-info {
+  background-color: #1e3a5f;
+  border: 1px solid #3b82f6;
 }
 
 .app-footer {
