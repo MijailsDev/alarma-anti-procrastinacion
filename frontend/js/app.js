@@ -1,28 +1,184 @@
-// Configuración del API
 const API_BASE = 'http://localhost:3000/api';
 
-// Sistema de Audio - Web Audio API (Generador de Alarma Agresiva)
 let audioCtx = null;
 let alarmIntervalId = null;
 let isSilenced = false;
 let silenceTimeoutId = null;
 
-// Control de notificaciones nativas
 const notifiedTasks = new Set();
 let notificationsEnabled = false;
 
-// Inicializar el contexto de audio en la primera interacción del usuario (política de navegadores)
+/* ---- TOKEN / AUTH HELPERS ---- */
+
+function getToken() {
+  return localStorage.getItem('jwt_token');
+}
+
+function setToken(token) {
+  localStorage.setItem('jwt_token', token);
+}
+
+function clearToken() {
+  localStorage.removeItem('jwt_token');
+  localStorage.removeItem('jwt_user');
+}
+
+function getAuthHeaders() {
+  const token = getToken();
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
+}
+
+async function apiFetch(url, options = {}) {
+  const res = await fetch(url, {
+    ...options,
+    headers: { ...getAuthHeaders(), ...options.headers }
+  });
+  if (res.status === 401) {
+    clearToken();
+    showAuth();
+    showToast('Sesión expirada. Inicia sesión nuevamente.', 'error');
+    return null;
+  }
+  return res;
+}
+
+function getStoredUser() {
+  try {
+    return JSON.parse(localStorage.getItem('jwt_user'));
+  } catch {
+    return null;
+  }
+}
+
+function setStoredUser(user) {
+  localStorage.setItem('jwt_user', JSON.stringify(user));
+}
+
+function showApp(username) {
+  document.getElementById('auth-container').style.display = 'none';
+  document.getElementById('app-container').style.display = 'block';
+  if (username) {
+    document.getElementById('user-badge').textContent = `👤 ${username}`;
+  }
+}
+
+function showAuth() {
+  document.getElementById('auth-container').style.display = 'flex';
+  document.getElementById('app-container').style.display = 'none';
+  stopAudioAlarmLoop();
+  document.getElementById('global-panic-bar').classList.remove('panic-active');
+  document.getElementById('global-panic-bar').classList.add('panic-hidden');
+}
+
+function switchAuthForm(formId) {
+  document.querySelectorAll('.auth-form').forEach(f => f.classList.remove('active'));
+  document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(formId).classList.add('active');
+  document.querySelector(`.auth-tab[data-form="${formId}"]`).classList.add('active');
+  document.getElementById('login-error').textContent = '';
+  document.getElementById('register-error').textContent = '';
+}
+
+/* ---- ENDPOINTS DE AUTENTICACIÓN ---- */
+
+async function handleLogin(e) {
+  e.preventDefault();
+  const username = document.getElementById('login-username').value.trim();
+  const password = document.getElementById('login-password').value.trim();
+  const errorEl = document.getElementById('login-error');
+  errorEl.textContent = '';
+
+  if (!username || !password) {
+    errorEl.textContent = 'Completa todos los campos.';
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      errorEl.textContent = data.error || 'Error al iniciar sesión.';
+      return;
+    }
+
+    setToken(data.token);
+    setStoredUser(data.user);
+    showApp(data.user.username);
+    document.getElementById('login-form').reset();
+    loadApp();
+  } catch (err) {
+    errorEl.textContent = 'Error de conexión con el servidor.';
+  }
+}
+
+async function handleRegister(e) {
+  e.preventDefault();
+  const username = document.getElementById('register-username').value.trim();
+  const password = document.getElementById('register-password').value.trim();
+  const errorEl = document.getElementById('register-error');
+  errorEl.textContent = '';
+
+  if (!username || !password) {
+    errorEl.textContent = 'Completa todos los campos.';
+    return;
+  }
+
+  if (password.length < 6) {
+    errorEl.textContent = 'La contraseña debe tener al menos 6 caracteres.';
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      errorEl.textContent = data.error || 'Error al registrarse.';
+      return;
+    }
+
+    setToken(data.token);
+    setStoredUser(data.user);
+    showApp(data.user.username);
+    document.getElementById('register-form').reset();
+    loadApp();
+  } catch (err) {
+    errorEl.textContent = 'Error de conexión con el servidor.';
+  }
+}
+
+function handleLogout() {
+  clearToken();
+  showAuth();
+  stopAudioAlarmLoop();
+}
+
+/* ---- SISTEMA DE AUDIO ---- */
+
 function initAudio() {
   if (!audioCtx) {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   }
 }
 
-// Generar un pitido de alarma súper molesto usando Web Audio API (sin dependencias externas)
 function playBeep(frequency = 880, duration = 0.15) {
   if (!audioCtx) return;
-  
-  // Si el audio está suspendido (Chrome/Edge), reanudarlo
+
   if (audioCtx.state === 'suspended') {
     audioCtx.resume();
   }
@@ -30,11 +186,9 @@ function playBeep(frequency = 880, duration = 0.15) {
   const osc = audioCtx.createOscillator();
   const gain = audioCtx.createGain();
 
-  // Tipo de onda cuadrada (más estridente y molesta para romper el sueño)
-  osc.type = 'sawtooth'; 
+  osc.type = 'sawtooth';
   osc.frequency.setValueAtTime(frequency, audioCtx.currentTime);
 
-  // Controlar volumen agresivo pero seguro
   gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
   gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
 
@@ -45,30 +199,26 @@ function playBeep(frequency = 880, duration = 0.15) {
   osc.stop(audioCtx.currentTime + duration);
 }
 
-// Iniciar la ráfaga de alarmas según la gravedad
 function startAudioAlarmLoop(nivel) {
   stopAudioAlarmLoop();
-
   if (isSilenced) return;
 
   let intervalMs = 0;
   let freq = 880;
 
   if (nivel === '¡MÁXIMO PELIGRO (CRÍTICO)!') {
-    intervalMs = 800; // Pitido cada 0.8s
-    freq = 1100;      // Tono agudo penetrante
+    intervalMs = 800;
+    freq = 1100;
   } else if (nivel === 'Alto (Crítico)') {
-    intervalMs = 2500; // Pitido cada 2.5s
+    intervalMs = 2500;
     freq = 880;
   } else if (nivel === 'Moderado') {
-    intervalMs = 10000; // Pitido cada 10s
+    intervalMs = 10000;
     freq = 660;
   }
 
   if (intervalMs > 0) {
-    // Un pitido inicial
     playBeep(freq, 0.2);
-    // Bucle continuo
     alarmIntervalId = setInterval(() => {
       playBeep(freq, 0.2);
     }, intervalMs);
@@ -82,46 +232,59 @@ function stopAudioAlarmLoop() {
   }
 }
 
-// --- MANEJO DEL DOM Y CONEXIÓN API ---
+/* ---- INICIALIZACIÓN DE EVENTOS (una sola vez) ---- */
 
-document.addEventListener('DOMContentLoaded', () => {
-  // Intentar registrar el Service Worker para soporte PWA
-  registerServiceWorker();
-
-  // Cargar Tareas y Configuración al inicio
-  fetchTasks();
-  fetchConfig();
-
-  // Listeners de eventos
+function initAppEvents() {
   document.getElementById('refresh-tasks').addEventListener('click', fetchTasks);
   document.getElementById('task-form').addEventListener('submit', createTask);
   document.getElementById('save-margin-btn').addEventListener('click', updateMarginHours);
-  
   document.getElementById('notif-permit-btn').addEventListener('click', requestNotificationPermission);
-  
-  document.getElementById('silence-btn').addEventListener('click', () => {
-    initAudio();
-    isSilenced = true;
-    stopAudioAlarmLoop();
-    document.getElementById('global-panic-bar').classList.remove('panic-active');
-    document.getElementById('global-panic-bar').classList.add('panic-hidden');
-    console.log('Alarma silenciada por 3 minutos.');
-    
-    // Auto-restablecer silencio tras 3 minutos (para evitar que se duerma indefinidamente)
-    if (silenceTimeoutId) clearTimeout(silenceTimeoutId);
-    silenceTimeoutId = setTimeout(() => {
-      isSilenced = false;
-      fetchTasks(); // Reevaluar alarmas
-    }, 180000); // 3 minutos
+  document.getElementById('silence-btn').addEventListener('click', silenceHandler);
+  document.getElementById('logout-btn').addEventListener('click', handleLogout);
+  document.getElementById('login-form').addEventListener('submit', handleLogin);
+  document.getElementById('register-form').addEventListener('submit', handleRegister);
+
+  document.querySelectorAll('.auth-tab').forEach(tab => {
+    tab.addEventListener('click', () => switchAuthForm(tab.dataset.form));
   });
 
-  // Iniciar cuenta regresiva en vivo (actualiza cada 30s)
-  startCountdown();
+  document.body.addEventListener('click', () => { initAudio(); }, { once: true });
 
-  // Activar audio en el primer click de la pantalla
-  document.body.addEventListener('click', () => {
-    initAudio();
-  }, { once: true });
+  startCountdown();
+}
+
+function silenceHandler() {
+  initAudio();
+  isSilenced = true;
+  stopAudioAlarmLoop();
+  document.getElementById('global-panic-bar').classList.remove('panic-active');
+  document.getElementById('global-panic-bar').classList.add('panic-hidden');
+
+  if (silenceTimeoutId) clearTimeout(silenceTimeoutId);
+  silenceTimeoutId = setTimeout(() => {
+    isSilenced = false;
+    fetchTasks();
+  }, 180000);
+}
+
+function loadApp() {
+  fetchTasks();
+  fetchConfig();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  initAppEvents();
+  registerServiceWorker();
+
+  const token = getToken();
+  const user = getStoredUser();
+
+  if (token && user) {
+    showApp(user.username);
+    loadApp();
+  } else {
+    showAuth();
+  }
 });
 
 function startCountdown() {
@@ -130,26 +293,26 @@ function startCountdown() {
   countdownIntervalId = setInterval(updateAllCountdowns, 30000);
 }
 
-// Registrar Service Worker de PWA
 async function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
     try {
       const reg = await navigator.serviceWorker.register('/sw.js');
-      console.log('✅ Service Worker registrado con éxito en el alcance:', reg.scope);
+      console.log('Service Worker registrado:', reg.scope);
     } catch (err) {
-      console.warn('⚠️ No se pudo registrar el Service Worker de la PWA:', err.message);
+      console.warn('Service Worker no disponible:', err.message);
     }
   }
 }
 
-// Obtener tareas y renderizarlas
+/* ---- CRUD DE TAREAS ---- */
+
 async function fetchTasks() {
   const container = document.getElementById('tasks-list');
-  
+
   try {
-    const res = await fetch(`${API_BASE}/tareas`);
-    if (!res.ok) throw new Error('Error al conectar con la API');
-    
+    const res = await apiFetch(`${API_BASE}/tareas`);
+    if (!res) return;
+
     const tareas = await res.json();
     renderTasks(tareas);
     evaluateGlobalAlarms(tareas);
@@ -158,14 +321,13 @@ async function fetchTasks() {
     console.error('fetchTasks error:', err);
     container.innerHTML = `
       <div class="empty-state">
-        <p style="color: #ef4444;">❌ No se pudo conectar con el servidor Express backend.</p>
+        <p style="color: #ef4444;">No se pudo conectar con el servidor Express backend.</p>
         <p style="font-size: 0.85rem; margin-top: 10px;">Asegúrate de que 'docker-compose up' esté corriendo correctamente.</p>
       </div>
     `;
   }
 }
 
-// Renderizar tarjetas separando activas de completadas
 function renderTasks(tareas) {
   const container = document.getElementById('tasks-list');
   const historyContainer = document.getElementById('history-list');
@@ -179,7 +341,7 @@ function renderTasks(tareas) {
   if (activas.length === 0) {
     container.innerHTML = `
       <div class="empty-state">
-        <p>🎉 ¡Excelente! No tienes tareas pendientes actualmente.</p>
+        <p>Excelente! No tienes tareas pendientes actualmente.</p>
         <p style="font-size: 0.85rem; margin-top: 10px;">Añade una nueva tarea a la izquierda para activar el escudo anti-procrastinación.</p>
       </div>
     `;
@@ -195,7 +357,6 @@ function renderTasks(tareas) {
 }
 
 let countdownIntervalId = null;
-
 let toastTimeoutId = null;
 
 function showToast(message, type = 'info', duration = 3500) {
@@ -230,7 +391,7 @@ const ALERT_LABELS = {
   'Bajo': 'Estado: Óptimo',
   'Moderado': 'Atención Requerida',
   'Alto (Crítico)': 'Prioridad Máxima',
-  '¡MÁXIMO PELIGRO (CRÍTICO)!': 'FFL Vencida — Acción Inmediata'
+  '¡MÁXIMO PELIGRO (CRÍTICO)!': 'FFL Vencida &mdash; Acción Inmediata'
 };
 
 function renderActiveCard(tarea) {
@@ -345,7 +506,6 @@ function updateAllCountdowns() {
   }
 }
 
-// Tarjeta resumida para tarea completada
 function renderCompletedCard(tarea) {
   const fReal = new Date(tarea.fecha_limite_real).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' });
   const fFalsa = new Date(tarea.fecha_limite_falsa).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' });
@@ -377,7 +537,6 @@ function renderCompletedCard(tarea) {
   `;
 }
 
-// Crear una tarea nueva mediante el formulario
 async function createTask(e) {
   e.preventDefault();
   initAudio();
@@ -391,28 +550,25 @@ async function createTask(e) {
     return;
   }
 
-  // Convertir la hora local del input (UTC-5 Perú) a ISO UTC
-  // para evitar el timezone bug al guardar en MySQL (Docker corre en UTC)
   const localDate = new Date(fechaLimiteReal);
   const fechaUtc = localDate.toISOString();
 
   try {
-    const res = await fetch(`${API_BASE}/tareas`, {
+    const res = await apiFetch(`${API_BASE}/tareas`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         titulo,
         descripcion,
         fecha_limite_real: fechaUtc
       })
     });
+    if (!res) return;
 
     if (!res.ok) {
       const errData = await res.json();
       throw new Error(errData.error || 'No se pudo crear la tarea');
     }
 
-    // Resetear formulario y recargar tareas
     document.getElementById('task-form').reset();
     fetchTasks();
     showToast('🎉 Tarea creada con FFL calculada.', 'success');
@@ -421,24 +577,21 @@ async function createTask(e) {
   }
 }
 
-// Actualizar el estado de una tarea aplicando validación estricta
 window.updateTaskStatus = async function(id, nuevoEstado) {
   initAudio();
-  
-  // Limpieza del parámetro si hay error de string (como 'En Enviada' que pusimos por claridad de estado)
+
   const estadoFinal = nuevoEstado === 'En Enviada' ? 'Enviada' : nuevoEstado;
 
   try {
-    const res = await fetch(`${API_BASE}/tareas/${id}/estado`, {
+    const res = await apiFetch(`${API_BASE}/tareas/${id}/estado`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ nuevoEstado: estadoFinal })
     });
+    if (!res) return;
 
     const data = await res.json();
 
     if (!res.ok) {
-      // Mostrar el error estricto de la máquina de estados
       showToast(`⚠️ ${data.error}`, 'error');
       return;
     }
@@ -450,16 +603,13 @@ window.updateTaskStatus = async function(id, nuevoEstado) {
   }
 };
 
-// Evaluar el nivel general de alarmas activas en la app para disparar alarmas sonoras, interfaz de pánico y notificaciones nativas
 function evaluateGlobalAlarms(tareas) {
   if (isSilenced) return;
 
-  // Filtrar tareas que no han sido entregadas
   const activas = tareas.filter(t => t.estado !== 'Enviada');
 
-  // Encontrar la alarma con el nivel de gravedad más alto
   let maxAlarma = 'Ninguno';
-  
+
   const jerarquia = { 'Ninguno': 0, 'Bajo': 1, 'Moderado': 2, 'Alto (Crítico)': 3, '¡MÁXIMO PELIGRO (CRÍTICO)!': 4 };
 
   activas.forEach(t => {
@@ -469,7 +619,6 @@ function evaluateGlobalAlarms(tareas) {
       maxAlarma = nivelActual;
     }
 
-    // Disparar notificación nativa si la tarea entra en estado crítico o máximo peligro
     if (nivelActual === 'Alto (Crítico)' || nivelActual === '¡MÁXIMO PELIGRO (CRÍTICO)!') {
       sendNativeNotification(
         `⚠️ "${t.titulo}" — ${nivelActual}. Te quedan menos de 1 hora para tu Falsa Fecha Límite. ¡Entrega YA!`,
@@ -480,7 +629,6 @@ function evaluateGlobalAlarms(tareas) {
 
   const panicBar = document.getElementById('global-panic-bar');
 
-  // Si hay alguna tarea en máximo peligro, activar la pantalla estroboscópica de pánico y play beeper
   if (maxAlarma === '¡MÁXIMO PELIGRO (CRÍTICO)!') {
     panicBar.classList.remove('panic-hidden');
     panicBar.classList.add('panic-active');
@@ -494,18 +642,16 @@ function evaluateGlobalAlarms(tareas) {
     panicBar.classList.remove('panic-active');
     startAudioAlarmLoop('Moderado');
   } else {
-    // Apagar alarmas
     panicBar.classList.add('panic-hidden');
     panicBar.classList.remove('panic-active');
     stopAudioAlarmLoop();
   }
 }
 
-// Obtener configuración actual del margen FFL
 async function fetchConfig() {
   try {
-    const res = await fetch(`${API_BASE}/configuracion`);
-    if (!res.ok) return;
+    const res = await apiFetch(`${API_BASE}/configuracion`);
+    if (!res) return;
     const data = await res.json();
     document.getElementById('margin-input').value = data.margen_horas;
   } catch (err) {
@@ -513,7 +659,6 @@ async function fetchConfig() {
   }
 }
 
-// Actualizar el margen de horas (colchón FFL)
 async function updateMarginHours() {
   const input = document.getElementById('margin-input');
   const feedback = document.getElementById('margin-feedback');
@@ -526,11 +671,11 @@ async function updateMarginHours() {
   }
 
   try {
-    const res = await fetch(`${API_BASE}/configuracion`, {
+    const res = await apiFetch(`${API_BASE}/configuracion`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ margen_horas: margenHoras })
     });
+    if (!res) return;
 
     const data = await res.json();
 
@@ -547,14 +692,14 @@ async function updateMarginHours() {
   }
 }
 
-// Eliminar tarea físicamente
 window.deleteTask = async function(id) {
   if (!confirm('¿Estás seguro de eliminar esta tarea permanentemente?')) return;
 
   try {
-    const res = await fetch(`${API_BASE}/tareas/${id}`, {
+    const res = await apiFetch(`${API_BASE}/tareas/${id}`, {
       method: 'DELETE'
     });
+    if (!res) return;
 
     if (!res.ok) {
       const errData = await res.json();
@@ -567,11 +712,9 @@ window.deleteTask = async function(id) {
   }
 };
 
-// Alternar activación/desactivación de notificaciones nativas
 async function requestNotificationPermission() {
   const btn = document.getElementById('notif-permit-btn');
 
-  // Si ya están activadas, desactivar
   if (notificationsEnabled) {
     notificationsEnabled = false;
     btn.textContent = '🔔';
@@ -596,7 +739,6 @@ async function requestNotificationPermission() {
     return;
   }
 
-  // Solicitar permiso por primera vez
   const permission = await Notification.requestPermission();
   if (permission === 'granted') {
     notificationsEnabled = true;
@@ -605,7 +747,6 @@ async function requestNotificationPermission() {
   }
 }
 
-// Enviar notificación nativa al sistema operativo
 function sendNativeNotification(titulo, tareaId) {
   if (!notificationsEnabled || !('Notification' in window) || Notification.permission !== 'granted') return;
   if (notifiedTasks.has(tareaId)) return;
@@ -631,10 +772,9 @@ function sendNativeNotification(titulo, tareaId) {
   }
 }
 
-// Escapar cadenas HTML para evitar vulnerabilidades XSS en las vistas
 function escapeHTML(str) {
   if (!str) return '';
-  return str.replace(/[&<>'"]/g, 
+  return str.replace(/[&<>'"]/g,
     tag => ({
       '&': '&amp;',
       '<': '&lt;',

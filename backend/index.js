@@ -2,14 +2,16 @@ import express from 'express';
 import mysql from 'mysql2/promise';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
 
-// Cargar variables de entorno
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const JWT_SECRET = process.env.JWT_SECRET || 'alarma-anti-procrastinacion-secret-key-2026';
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 
-// Middleware
 app.use(cors());
 app.use(express.json());
 
@@ -53,6 +55,25 @@ async function connectDatabase() {
 
 // Inicializar base de datos al arrancar
 await connectDatabase();
+
+// --- MIDDLEWARE DE AUTENTICACIÓN JWT ---
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ error: 'Token de autenticación requerido.' });
+  }
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.usuarioId = decoded.id;
+    req.username = decoded.username;
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: 'Token inválido o expirado.' });
+  }
+}
 
 // --- LÓGICA DE NEGOCIO: MÁQUINA DE ESTADOS Y CÁLCULO DE ALARMAS ---
 
@@ -115,7 +136,92 @@ function calcularAlarma(fechaLimiteFalsa, estado) {
   }
 }
 
-// --- ENDPOINTS DE LA API ---
+// --- ENDPOINTS DE AUTENTICACIÓN ---
+
+// Registro de nuevo usuario
+app.post('/api/register', async (req, res) => {
+  const { username, password } = req.body;
+
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Usuario y contraseña son obligatorios.' });
+  }
+
+  if (password.length < 6) {
+    return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres.' });
+  }
+
+  try {
+    const [existing] = await pool.query('SELECT id FROM usuarios WHERE username = ?', [username]);
+    if (existing.length > 0) {
+      return res.status(409).json({ error: 'El nombre de usuario ya existe.' });
+    }
+
+    const email = `${username}@alarma.app`;
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    const [result] = await pool.query(
+      'INSERT INTO usuarios (username, email, password_hash) VALUES (?, ?, ?)',
+      [username, email, passwordHash]
+    );
+
+    const token = jwt.sign(
+      { id: result.insertId, username },
+      JWT_SECRET,
+      { expiresIn: JWT_EXPIRES_IN }
+    );
+
+    res.status(201).json({
+      mensaje: 'Usuario registrado con éxito.',
+      token,
+      user: { id: result.insertId, username }
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Error al registrar usuario', detalles: err.message });
+  }
+});
+
+// Inicio de sesión
+app.post('/api/login', async (req, res) => {
+  const { username, password } = req.body;
+
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Usuario y contraseña son obligatorios.' });
+  }
+
+  try {
+    const [usuarios] = await pool.query(
+      'SELECT id, username, password_hash FROM usuarios WHERE username = ?',
+      [username]
+    );
+
+    if (usuarios.length === 0) {
+      return res.status(401).json({ error: 'Credenciales inválidas.' });
+    }
+
+    const user = usuarios[0];
+    const passwordMatch = await bcrypt.compare(password, user.password_hash);
+
+    if (!passwordMatch) {
+      return res.status(401).json({ error: 'Credenciales inválidas.' });
+    }
+
+    const token = jwt.sign(
+      { id: user.id, username: user.username },
+      JWT_SECRET,
+      { expiresIn: JWT_EXPIRES_IN }
+    );
+
+    res.json({
+      mensaje: 'Inicio de sesión exitoso.',
+      token,
+      user: { id: user.id, username: user.username }
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Error al iniciar sesión', detalles: err.message });
+  }
+});
+
+// --- ENDPOINTS DE LA API (Protegidos) ---
 
 // 1. Endpoint de Salud (Health Check)
 app.get('/api/health', async (req, res) => {
@@ -127,12 +233,10 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
-// 2. Obtener todas las tareas de un usuario con sus alarmas dinámicas calculadas en tiempo real
-app.get('/api/tareas', async (req, res) => {
+// 2. Obtener todas las tareas del usuario autenticado con sus alarmas dinámicas calculadas en tiempo real
+app.get('/api/tareas', authenticateToken, async (req, res) => {
   try {
-    // Por simplicidad, usamos el usuario_id = 1 (estudiante_unamad)
-    const usuarioId = 1;
-    const [tareas] = await pool.query('SELECT * FROM tareas WHERE usuario_id = ? ORDER BY fecha_limite_falsa ASC', [usuarioId]);
+    const [tareas] = await pool.query('SELECT * FROM tareas WHERE usuario_id = ? ORDER BY fecha_limite_falsa ASC', [req.usuarioId]);
 
     // Enriquecer tareas con la lógica de alarmas en tiempo real
     const tareasConAlarmas = tareas.map(tarea => {
@@ -150,9 +254,9 @@ app.get('/api/tareas', async (req, res) => {
 });
 
 // 3. Crear una nueva tarea con cálculo automático de Falsa Fecha Límite (FFL)
-app.post('/api/tareas', async (req, res) => {
+app.post('/api/tareas', authenticateToken, async (req, res) => {
   const { titulo, descripcion, fecha_limite_real } = req.body;
-  const usuarioId = 1; // Estudiante por defecto
+  const usuarioId = req.usuarioId;
 
   if (!titulo || !fecha_limite_real) {
     return res.status(400).json({ error: 'El título y la fecha límite real son obligatorios.' });
@@ -201,7 +305,7 @@ app.post('/api/tareas', async (req, res) => {
 });
 
 // 4. Actualizar estado de una tarea aplicando la Máquina de Estados Estricta
-app.put('/api/tareas/:id/estado', async (req, res) => {
+app.put('/api/tareas/:id/estado', authenticateToken, async (req, res) => {
   const { id } = req.params;
   const { nuevoEstado } = req.body;
 
@@ -210,8 +314,7 @@ app.put('/api/tareas/:id/estado', async (req, res) => {
   }
 
   try {
-    // Obtener el estado actual de la tarea
-    const [tareas] = await pool.query('SELECT estado, titulo FROM tareas WHERE id = ?', [id]);
+    const [tareas] = await pool.query('SELECT estado, titulo FROM tareas WHERE id = ? AND usuario_id = ?', [id, req.usuarioId]);
     if (tareas.length === 0) {
       return res.status(404).json({ error: 'La tarea no existe.' });
     }
@@ -244,9 +347,9 @@ app.put('/api/tareas/:id/estado', async (req, res) => {
 });
 
 // 5. Obtener configuración del usuario (margen_horas)
-app.get('/api/configuracion', async (req, res) => {
+app.get('/api/configuracion', authenticateToken, async (req, res) => {
   try {
-    const [usuarios] = await pool.query('SELECT margen_horas FROM usuarios WHERE id = 1');
+    const [usuarios] = await pool.query('SELECT margen_horas FROM usuarios WHERE id = ?', [req.usuarioId]);
     if (usuarios.length === 0) {
       return res.status(404).json({ error: 'Usuario no encontrado.' });
     }
@@ -257,9 +360,9 @@ app.get('/api/configuracion', async (req, res) => {
 });
 
 // 6. Actualizar configuración del usuario (margen_horas)
-app.put('/api/configuracion', async (req, res) => {
+app.put('/api/configuracion', authenticateToken, async (req, res) => {
   const { margen_horas } = req.body;
-  const usuarioId = 1;
+  const usuarioId = req.usuarioId;
 
   if (margen_horas === undefined || margen_horas < 1 || margen_horas > 72) {
     return res.status(400).json({ error: 'El margen de horas debe ser un número entre 1 y 72.' });
@@ -284,12 +387,12 @@ app.put('/api/configuracion', async (req, res) => {
   }
 });
 
-// 7. Eliminar tarea físicamente
-app.delete('/api/tareas/:id', async (req, res) => {
+// 7. Eliminar tarea físicamente (solo si pertenece al usuario autenticado)
+app.delete('/api/tareas/:id', authenticateToken, async (req, res) => {
   const { id } = req.params;
 
   try {
-    const [result] = await pool.query('DELETE FROM tareas WHERE id = ?', [id]);
+    const [result] = await pool.query('DELETE FROM tareas WHERE id = ? AND usuario_id = ?', [id, req.usuarioId]);
     if (result.affectedRows === 0) {
       return res.status(404).json({ error: 'La tarea no existe.' });
     }
@@ -300,13 +403,11 @@ app.delete('/api/tareas/:id', async (req, res) => {
 });
 
 // 8. Endpoint de Monitoreo de Alarmas Activas (Soporte conceptual para el Worker de Alerta Agresiva)
-app.get('/api/alarmas', async (req, res) => {
+app.get('/api/alarmas', authenticateToken, async (req, res) => {
   try {
-    const usuarioId = 1;
-    // Obtener tareas activas (no enviadas)
     const [tareasActivas] = await pool.query(
       'SELECT id, titulo, fecha_limite_falsa, estado FROM tareas WHERE usuario_id = ? AND estado != ?',
-      [usuarioId, ESTADOS.ENVIADA]
+      [req.usuarioId, ESTADOS.ENVIADA]
     );
 
     const alarmasDisparadas = tareasActivas.map(tarea => {
