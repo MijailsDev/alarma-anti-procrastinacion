@@ -6,10 +6,11 @@
   <title>Alarma Anti-Procrastinación</title>
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#121214">
-  <link rel="stylesheet" href="css/styles.css">
+  <meta name="description" content="Alarma basada en Falsa Fecha Límite para evitar postergar entregas académicas.">
+  <link rel="stylesheet" href="css/styles.css" media="all">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;800&family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;800&family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 </head>
 <body>
 
@@ -72,11 +73,12 @@
         <span class="logo-emoji">⏱️</span>
         <h1>Alarma Anti-Procrastinación</h1>
       </div>
-      <div class="header-actions">
-        <span id="user-badge" class="student-badge"></span>
-        <button id="theme-toggle" class="btn-theme-toggle" title="Cambiar tema">🌙</button>
-        <button id="notif-permit-btn" class="btn-notif-permit" title="Activar notificaciones del sistema">🔔</button>
-        <button id="logout-btn" class="btn-logout" title="Cerrar sesión">🚪 Salir</button>
+      <div class="header-actions" role="toolbar" aria-label="Acciones de la aplicación">
+        <span id="user-badge" class="student-badge" aria-live="polite"></span>
+        <button id="theme-toggle" class="btn-theme-toggle" title="Cambiar tema" aria-label="Cambiar entre tema oscuro y claro">🌙</button>
+        <button id="contrast-toggle" class="btn-contrast-toggle" title="Activar alto contraste" aria-label="Activar modo de alto contraste">🔲</button>
+        <button id="notif-permit-btn" class="btn-notif-permit" title="Activar notificaciones del sistema" aria-label="Activar o desactivar notificaciones">🔔</button>
+        <button id="logout-btn" class="btn-logout" title="Cerrar sesión" aria-label="Cerrar sesión">🚪 Salir</button>
       </div>
     </header>
 
@@ -132,9 +134,32 @@
           <span class="legend-item"><span class="dot dot-panic"></span> FFL Vencida</span>
         </div>
 
-        <div id="tasks-list" class="tasks-grid">
-          <div class="loading-state">
-            <p>Conectando al backend de Alarma y cargando tareas...</p>
+        <div id="tasks-list" class="tasks-grid" role="list" aria-label="Lista de tareas activas" aria-live="polite" aria-relevant="additions removals">
+          <div class="skeleton-card" aria-hidden="true">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start">
+              <div class="skeleton-title"></div>
+              <div class="skeleton-badge"></div>
+            </div>
+            <div class="skeleton-line long"></div>
+            <div class="skeleton-dates">
+              <div class="skeleton-line"></div>
+              <div class="skeleton-line"></div>
+            </div>
+            <div class="skeleton-line block"></div>
+            <div class="skeleton-line block" style="width:60%"></div>
+          </div>
+          <div class="skeleton-card" aria-hidden="true">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start">
+              <div class="skeleton-title"></div>
+              <div class="skeleton-badge"></div>
+            </div>
+            <div class="skeleton-line long"></div>
+            <div class="skeleton-dates">
+              <div class="skeleton-line"></div>
+              <div class="skeleton-line"></div>
+            </div>
+            <div class="skeleton-line block"></div>
+            <div class="skeleton-line block" style="width:60%"></div>
           </div>
         </div>
       </section>

@@ -1,22 +1,29 @@
 {
   "short_name": "AlarmaAntiProc",
-  "name": "Alarma Anti-Procrastinación",
-  "description": "Alarma basada en Falsa Fecha Límite para evitar postergar entregas.",
+  "name": "Alarma Anti-Procrastinacion",
+  "description": "Alarma basada en Falsa Fecha Limite para evitar postergar entregas academicas.",
   "start_url": "/index.html",
   "background_color": "#08080a",
-  "theme_color": "#ef4444",
+  "theme_color": "#7dcfff",
   "display": "standalone",
   "orientation": "portrait-primary",
+  "categories": ["education", "productivity", "utilities"],
+  "lang": "es-PE",
+  "scope": "/",
   "icons": [
     {
       "src": "/icons/icon-192.svg",
       "type": "image/svg+xml",
-      "sizes": "192x192"
+      "sizes": "192x192",
+      "purpose": "any maskable"
     },
     {
       "src": "/icons/icon-512.svg",
       "type": "image/svg+xml",
-      "sizes": "512x512"
+      "sizes": "512x512",
+      "purpose": "any maskable"
     }
-  ]
+  ],
+  "screenshots": [],
+  "prefer_related_applications": false
 }

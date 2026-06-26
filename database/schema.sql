@@ -29,6 +29,18 @@ CREATE TABLE IF NOT EXISTS `tareas` (
 -- Migración para BD existentes: renombrar password a password_hash
 -- ALTER TABLE usuarios CHANGE COLUMN password password_hash VARCHAR(255) NOT NULL;
 
+-- Tabla de Refresh Tokens
+CREATE TABLE IF NOT EXISTS `refresh_tokens` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `user_id` INT NOT NULL,
+    `token` VARCHAR(80) NOT NULL UNIQUE,
+    `expires_at` DATETIME NOT NULL,
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (`user_id`) REFERENCES `usuarios`(`id`) ON DELETE CASCADE,
+    INDEX `idx_token` (`token`),
+    INDEX `idx_expires` (`expires_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Seed: usuario de prueba con contraseña hasheada (unamad2026 con bcrypt)
 INSERT INTO `usuarios` (`id`, `username`, `email`, `password_hash`, `margen_horas`)
 VALUES (1, 'estudiante_unamad', 'sistemas.unamad@gmail.com', '$2b$10$st.r8pI5QUnyQPbnvQxksODN7uz1D5tOQpmvickgulDMnH3A7Bkha', 5)

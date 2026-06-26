@@ -8,7 +8,53 @@ let silenceTimeoutId = null;
 const notifiedTasks = new Set();
 let notificationsEnabled = false;
 
+/* ---- SKELETON LOADERS ---- */
+function showSkeleton(container) {
+  container.innerHTML = `
+    <div class="skeleton-card" aria-hidden="true">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div class="skeleton-title"></div>
+        <div class="skeleton-badge"></div>
+      </div>
+      <div class="skeleton-line long"></div>
+      <div class="skeleton-dates">
+        <div class="skeleton-line"></div>
+        <div class="skeleton-line"></div>
+      </div>
+      <div class="skeleton-line block"></div>
+      <div class="skeleton-line block" style="width:60%"></div>
+    </div>
+    <div class="skeleton-card" aria-hidden="true">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div class="skeleton-title"></div>
+        <div class="skeleton-badge"></div>
+      </div>
+      <div class="skeleton-line long"></div>
+      <div class="skeleton-dates">
+        <div class="skeleton-line"></div>
+        <div class="skeleton-line"></div>
+      </div>
+      <div class="skeleton-line block"></div>
+      <div class="skeleton-line block" style="width:60%"></div>
+    </div>
+  `;
+}
+
+/* ---- BUTTON LOADING STATE ---- */
+function setLoading(btn, isLoading) {
+  if (isLoading) {
+    btn.classList.add('btn-loading');
+    btn.disabled = true;
+  } else {
+    btn.classList.remove('btn-loading');
+    btn.disabled = false;
+  }
+}
+
 /* ---- TOKEN / AUTH HELPERS ---- */
+
+let isRefreshing = false;
+let refreshPromise = null;
 
 function getToken() {
   return localStorage.getItem('jwt_token');
@@ -18,8 +64,17 @@ function setToken(token) {
   localStorage.setItem('jwt_token', token);
 }
 
+function getRefreshToken() {
+  return localStorage.getItem('jwt_refresh_token');
+}
+
+function setRefreshToken(token) {
+  localStorage.setItem('jwt_refresh_token', token);
+}
+
 function clearToken() {
   localStorage.removeItem('jwt_token');
+  localStorage.removeItem('jwt_refresh_token');
   localStorage.removeItem('jwt_user');
 }
 
@@ -32,17 +87,59 @@ function getAuthHeaders() {
   return headers;
 }
 
+async function refreshAccessToken() {
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) return null;
+
+  try {
+    const res = await fetch(`${API_BASE}/refresh-token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken })
+    });
+
+    if (!res.ok) return null;
+
+    const data = await res.json();
+    setToken(data.token);
+    setRefreshToken(data.refreshToken);
+    return data.token;
+  } catch {
+    return null;
+  }
+}
+
 async function apiFetch(url, options = {}) {
   const res = await fetch(url, {
     ...options,
     headers: { ...getAuthHeaders(), ...options.headers }
   });
+
   if (res.status === 401) {
-    clearToken();
-    showAuth();
-    showToast('Sesión expirada. Inicia sesión nuevamente.', 'error');
-    return null;
+    if (!isRefreshing) {
+      isRefreshing = true;
+      refreshPromise = refreshAccessToken().finally(() => {
+        isRefreshing = false;
+        refreshPromise = null;
+      });
+    }
+
+    const newToken = await refreshPromise;
+
+    if (!newToken) {
+      clearToken();
+      showAuth();
+      showToast('Sesión expirada. Inicia sesión nuevamente.', 'error');
+      return null;
+    }
+
+    const retryRes = await fetch(url, {
+      ...options,
+      headers: { ...getAuthHeaders(), ...options.headers }
+    });
+    return retryRes;
   }
+
   return res;
 }
 
@@ -112,6 +209,7 @@ async function handleLogin(e) {
     }
 
     setToken(data.token);
+    if (data.refreshToken) setRefreshToken(data.refreshToken);
     setStoredUser(data.user);
     showApp(data.user.username);
     document.getElementById('login-form').reset();
@@ -153,6 +251,7 @@ async function handleRegister(e) {
     }
 
     setToken(data.token);
+    if (data.refreshToken) setRefreshToken(data.refreshToken);
     setStoredUser(data.user);
     showApp(data.user.username);
     document.getElementById('register-form').reset();
@@ -249,6 +348,23 @@ function applySavedTheme() {
   }
 }
 
+/* ---- HIGH CONTRAST TOGGLE ---- */
+
+function toggleContrast() {
+  const isHigh = document.body.classList.toggle('high-contrast');
+  localStorage.setItem('highContrast', isHigh ? 'true' : '');
+  const btn = document.getElementById('contrast-toggle');
+  if (btn) btn.textContent = isHigh ? '🔲✓' : '🔲';
+}
+
+function applySavedContrast() {
+  if (localStorage.getItem('highContrast')) {
+    document.body.classList.add('high-contrast');
+    const btn = document.getElementById('contrast-toggle');
+    if (btn) btn.textContent = '🔲✓';
+  }
+}
+
 /* ---- INICIALIZACIÓN DE EVENTOS (una sola vez) ---- */
 
 function initAppEvents() {
@@ -256,6 +372,7 @@ function initAppEvents() {
   document.getElementById('task-form').addEventListener('submit', createTask);
   document.getElementById('save-margin-btn').addEventListener('click', updateMarginHours);
   document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
+  document.getElementById('contrast-toggle').addEventListener('click', toggleContrast);
   document.getElementById('notif-permit-btn').addEventListener('click', requestNotificationPermission);
   document.getElementById('silence-btn').addEventListener('click', silenceHandler);
   document.getElementById('logout-btn').addEventListener('click', handleLogout);
@@ -269,6 +386,15 @@ function initAppEvents() {
   document.body.addEventListener('click', () => { initAudio(); }, { once: true });
 
   startCountdown();
+
+  // Pausar countdowns cuando la pestaña está oculta
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      stopCountdown();
+    } else {
+      startCountdown();
+    }
+  });
 }
 
 function silenceHandler() {
@@ -292,6 +418,7 @@ function loadApp() {
 
 document.addEventListener('DOMContentLoaded', () => {
   applySavedTheme();
+  applySavedContrast();
   initAppEvents();
   registerServiceWorker();
 
@@ -307,9 +434,25 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function startCountdown() {
-  if (countdownIntervalId) clearInterval(countdownIntervalId);
+  if (countdownIntervalId) return;
+  let lastUpdate = 0;
+  function tick(now) {
+    if (now - lastUpdate >= 1000) {
+      lastUpdate = now;
+      updateAllCountdowns();
+    }
+    countdownIntervalId = requestAnimationFrame(tick);
+  }
   updateAllCountdowns();
-  countdownIntervalId = setInterval(updateAllCountdowns, 30000);
+  lastUpdate = performance.now();
+  countdownIntervalId = requestAnimationFrame(tick);
+}
+
+function stopCountdown() {
+  if (countdownIntervalId) {
+    cancelAnimationFrame(countdownIntervalId);
+    countdownIntervalId = null;
+  }
 }
 
 async function registerServiceWorker() {
@@ -327,6 +470,7 @@ async function registerServiceWorker() {
 
 async function fetchTasks() {
   const container = document.getElementById('tasks-list');
+  showSkeleton(container);
 
   try {
     const res = await apiFetch(`${API_BASE}/tareas`);
@@ -347,29 +491,52 @@ async function fetchTasks() {
   }
 }
 
+let lastTareasData = null;
+
 function renderTasks(tareas) {
   const container = document.getElementById('tasks-list');
-  const historyContainer = document.getElementById('history-list');
   const historyCount = document.getElementById('history-count');
+  const historyDetails = document.querySelector('.history-details');
 
   const activas = tareas.filter(t => t.estado !== 'Enviada');
   const completadas = tareas.filter(t => t.estado === 'Enviada');
 
+  lastTareasData = tareas;
   historyCount.textContent = completadas.length;
 
   if (activas.length === 0) {
     container.innerHTML = `
       <div class="empty-state">
         <p>Excelente! No tienes tareas pendientes actualmente.</p>
-        <p style="font-size: 0.85rem; margin-top: 10px;">Añade una nueva tarea a la izquierda para activar el escudo anti-procrastinación.</p>
+        <p style="font-size: 0.85rem; margin-top: 10px;">Anade una nueva tarea a la izquierda para activar el escudo anti-procrastinacion.</p>
       </div>
     `;
   } else {
     container.innerHTML = activas.map(tarea => renderActiveCard(tarea)).join('');
   }
 
+  // Lazy render historial solo cuando se abre
+  if (!historyDetails._lazyInit) {
+    historyDetails._lazyInit = true;
+    historyDetails.addEventListener('toggle', () => {
+      if (historyDetails.open && lastTareasData) {
+        renderHistory(lastTareasData);
+      }
+    });
+  }
+
+  // Si ya esta abierto, renderizar ahora
+  if (historyDetails.open) {
+    renderHistory(tareas);
+  }
+}
+
+function renderHistory(tareas) {
+  const historyContainer = document.getElementById('history-list');
+  const completadas = tareas.filter(t => t.estado === 'Enviada');
+
   if (completadas.length === 0) {
-    historyContainer.innerHTML = `<div class="empty-state"><p>Aún no hay tareas completadas.</p></div>`;
+    historyContainer.innerHTML = `<div class="empty-state"><p>Aun no hay tareas completadas.</p></div>`;
   } else {
     historyContainer.innerHTML = completadas.map(tarea => renderCompletedCard(tarea)).join('');
   }
@@ -572,6 +739,9 @@ async function createTask(e) {
   const localDate = new Date(fechaLimiteReal);
   const fechaUtc = localDate.toISOString();
 
+  const submitBtn = document.querySelector('#task-form .btn-submit');
+  setLoading(submitBtn, true);
+
   try {
     const res = await apiFetch(`${API_BASE}/tareas`, {
       method: 'POST',
@@ -590,9 +760,25 @@ async function createTask(e) {
 
     document.getElementById('task-form').reset();
     fetchTasks();
-    showToast('🎉 Tarea creada con FFL calculada.', 'success');
+    showToast('Tarea creada con FFL calculada.', 'success');
   } catch (err) {
-    showToast(`Error: ${err.message}`, 'error');
+    // Intentar encolar para background sync si hay service worker
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      try {
+        navigator.serviceWorker.controller.postMessage({
+          type: 'queue-task',
+          task: { titulo, descripcion, fecha_limite_real: fechaUtc }
+        });
+        showToast('Sin conexion. La tarea se sincronizara automaticamente.', 'info', 5000);
+        document.getElementById('task-form').reset();
+      } catch (swErr) {
+        showToast(`Error: ${err.message}`, 'error');
+      }
+    } else {
+      showToast(`Error: ${err.message}`, 'error');
+    }
+  } finally {
+    setLoading(submitBtn, false);
   }
 }
 
@@ -689,6 +875,9 @@ async function updateMarginHours() {
     return;
   }
 
+  const saveBtn = document.getElementById('save-margin-btn');
+  setLoading(saveBtn, true);
+
   try {
     const res = await apiFetch(`${API_BASE}/configuracion`, {
       method: 'PUT',
@@ -702,12 +891,14 @@ async function updateMarginHours() {
       throw new Error(data.error || 'Error al guardar');
     }
 
-    feedback.textContent = `✅ ${data.mensaje}`;
+    feedback.textContent = `${data.mensaje}`;
     feedback.className = 'margin-feedback success';
     fetchTasks();
   } catch (err) {
-    feedback.textContent = `❌ Error: ${err.message}`;
+    feedback.textContent = `Error: ${err.message}`;
     feedback.className = 'margin-feedback error';
+  } finally {
+    setLoading(saveBtn, false);
   }
 }
 
