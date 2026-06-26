@@ -232,12 +232,30 @@ function stopAudioAlarmLoop() {
   }
 }
 
+/* ---- THEME TOGGLE ---- */
+
+function toggleTheme() {
+  const isLight = document.body.classList.toggle('light-mode');
+  localStorage.setItem('theme', isLight ? 'light' : 'dark');
+  document.getElementById('theme-toggle').textContent = isLight ? '☀️' : '🌙';
+}
+
+function applySavedTheme() {
+  const savedTheme = localStorage.getItem('theme');
+  if (savedTheme === 'light') {
+    document.body.classList.add('light-mode');
+    const toggle = document.getElementById('theme-toggle');
+    if (toggle) toggle.textContent = '☀️';
+  }
+}
+
 /* ---- INICIALIZACIÓN DE EVENTOS (una sola vez) ---- */
 
 function initAppEvents() {
   document.getElementById('refresh-tasks').addEventListener('click', fetchTasks);
   document.getElementById('task-form').addEventListener('submit', createTask);
   document.getElementById('save-margin-btn').addEventListener('click', updateMarginHours);
+  document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
   document.getElementById('notif-permit-btn').addEventListener('click', requestNotificationPermission);
   document.getElementById('silence-btn').addEventListener('click', silenceHandler);
   document.getElementById('logout-btn').addEventListener('click', handleLogout);
@@ -273,6 +291,7 @@ function loadApp() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  applySavedTheme();
   initAppEvents();
   registerServiceWorker();
 
