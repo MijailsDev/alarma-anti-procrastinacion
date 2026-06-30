@@ -1,4 +1,5 @@
-const API_BASE = 'http://localhost:3000/api';
+import CONFIG from './config.js';
+import { formatRelativeDate } from './formatDate.js';
 
 let audioCtx = null;
 let alarmIntervalId = null;
@@ -7,6 +8,17 @@ let silenceTimeoutId = null;
 
 const notifiedTasks = new Set();
 let notificationsEnabled = false;
+
+/* ---- LUCIDE ICON HELPER ---- */
+function icon(name, extra = '') {
+  return `<i data-lucide="${name}" class="icon-inline ${extra}"></i>`;
+}
+
+function renderIcons() {
+  if (window.lucide) {
+    lucide.createIcons();
+  }
+}
 
 /* ---- SKELETON LOADERS ---- */
 function showSkeleton(container) {
@@ -92,7 +104,7 @@ async function refreshAccessToken() {
   if (!refreshToken) return null;
 
   try {
-    const res = await fetch(`${API_BASE}/refresh-token`, {
+    const res = await fetch(`${CONFIG.API_BASE}/refresh-token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refreshToken })
@@ -159,7 +171,8 @@ function showApp(username) {
   document.getElementById('auth-container').style.display = 'none';
   document.getElementById('app-container').style.display = 'block';
   if (username) {
-    document.getElementById('user-badge').textContent = `👤 ${username}`;
+    document.getElementById('user-badge').innerHTML = `${icon('user')}${escapeHTML(username)}`;
+    renderIcons();
   }
 }
 
@@ -195,7 +208,7 @@ async function handleLogin(e) {
   }
 
   try {
-    const res = await fetch(`${API_BASE}/login`, {
+    const res = await fetch(`${CONFIG.API_BASE}/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password })
@@ -237,7 +250,7 @@ async function handleRegister(e) {
   }
 
   try {
-    const res = await fetch(`${API_BASE}/register`, {
+    const res = await fetch(`${CONFIG.API_BASE}/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password })
@@ -336,7 +349,9 @@ function stopAudioAlarmLoop() {
 function toggleTheme() {
   const isLight = document.body.classList.toggle('light-mode');
   localStorage.setItem('theme', isLight ? 'light' : 'dark');
-  document.getElementById('theme-toggle').textContent = isLight ? '☀️' : '🌙';
+  const toggle = document.getElementById('theme-toggle');
+  toggle.innerHTML = isLight ? icon('sun', 'icon-only') : icon('moon', 'icon-only');
+  renderIcons();
 }
 
 function applySavedTheme() {
@@ -344,7 +359,8 @@ function applySavedTheme() {
   if (savedTheme === 'light') {
     document.body.classList.add('light-mode');
     const toggle = document.getElementById('theme-toggle');
-    if (toggle) toggle.textContent = '☀️';
+    if (toggle) toggle.innerHTML = icon('sun', 'icon-only');
+    renderIcons();
   }
 }
 
@@ -354,14 +370,16 @@ function toggleContrast() {
   const isHigh = document.body.classList.toggle('high-contrast');
   localStorage.setItem('highContrast', isHigh ? 'true' : '');
   const btn = document.getElementById('contrast-toggle');
-  if (btn) btn.textContent = isHigh ? '🔲✓' : '🔲';
+  if (btn) btn.innerHTML = isHigh ? icon('contrast', 'icon-only') + icon('check', 'icon-only') : icon('contrast', 'icon-only');
+  renderIcons();
 }
 
 function applySavedContrast() {
   if (localStorage.getItem('highContrast')) {
     document.body.classList.add('high-contrast');
     const btn = document.getElementById('contrast-toggle');
-    if (btn) btn.textContent = '🔲✓';
+    if (btn) btn.innerHTML = icon('contrast', 'icon-only') + icon('check', 'icon-only');
+    renderIcons();
   }
 }
 
@@ -414,6 +432,7 @@ function silenceHandler() {
 function loadApp() {
   fetchTasks();
   fetchConfig();
+  initAnalytics();
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -421,6 +440,7 @@ document.addEventListener('DOMContentLoaded', () => {
   applySavedContrast();
   initAppEvents();
   registerServiceWorker();
+  renderIcons();
 
   const token = getToken();
   const user = getStoredUser();
@@ -473,11 +493,12 @@ async function fetchTasks() {
   showSkeleton(container);
 
   try {
-    const res = await apiFetch(`${API_BASE}/tareas`);
+    const res = await apiFetch(`${CONFIG.API_BASE}/tareas`);
     if (!res) return;
 
     const tareas = await res.json();
     renderTasks(tareas);
+    renderIcons();
     evaluateGlobalAlarms(tareas);
     updateAllCountdowns();
   } catch (err) {
@@ -540,6 +561,7 @@ function renderHistory(tareas) {
   } else {
     historyContainer.innerHTML = completadas.map(tarea => renderCompletedCard(tarea)).join('');
   }
+  renderIcons();
 }
 
 let countdownIntervalId = null;
@@ -596,25 +618,23 @@ function renderActiveCard(tarea) {
   }
 
   const fReal = new Date(tarea.fecha_limite_real).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' });
-  const fFalsa = new Date(tarea.fecha_limite_falsa).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' });
 
   let actionButtons = '';
   if (tarea.estado === 'Pendiente') {
     actionButtons = `
       <button class="btn-action btn-start" onclick="updateTaskStatus(${tarea.id}, 'En Progreso')">
-        ⚡ Empezar Trabajo (Pendiente ➔ En Progreso)
+        ${icon('zap')}Empezar Trabajo (Pendiente → En Progreso)
       </button>
     `;
   } else if (tarea.estado === 'En Progreso') {
     actionButtons = `
       <button class="btn-action btn-submit-task" onclick="updateTaskStatus(${tarea.id}, 'En Enviada')">
-        📤 Marcar como Entregado
+        ${icon('upload')}Marcar como Entregado
       </button>
     `;
   }
 
   const alertLabel = ALERT_LABELS[tarea.alarma.nivel] || tarea.alarma.nivel;
-  const countdownHtml = renderCountdown(tarea.id, tarea.fecha_limite_falsa);
 
   return `
     <div class="task-card ${borderClass}">
@@ -622,21 +642,27 @@ function renderActiveCard(tarea) {
         <h3 class="task-title">${escapeHTML(tarea.titulo)}</h3>
         <div class="task-header-right">
           <span class="task-status ${tarea.estado.toLowerCase().replace(' ', '-')}">${tarea.estado}</span>
-          <button class="btn-delete" onclick="deleteTask(${tarea.id})" title="Eliminar tarea">🗑️</button>
+          <button class="btn-delete" onclick="deleteTask(${tarea.id})" title="Eliminar tarea">${icon('trash-2', 'icon-only')}</button>
         </div>
       </div>
       <p class="task-desc">${escapeHTML(tarea.descripcion || 'Sin descripción.')}</p>
       <div class="task-dates">
         <div class="date-block">
-          <strong>Límite Oficial:</strong>
-          <span>${fReal}</span>
-        </div>
-        <div class="date-block" style="color: var(--color-warning);">
-          <strong>Falsa Fecha Límite (FFL):</strong>
-          <span>${fFalsa}</span>
+          <strong>FFL</strong>
+          <span class="ffl-primary">${formatRelativeDate(tarea.fecha_limite_falsa)}</span>
+          <span class="real-trigger" tabindex="0" role="button" aria-label="Ver límite oficial">
+            ${icon('info')}
+            <span class="real-tooltip">
+            <span class="real-tooltip-label">Límite Oficial</span>
+            <span class="real-tooltip-date">${fReal}</span>
+          </span>
+          </span>
         </div>
       </div>
-      <div id="countdown-${tarea.id}" class="task-countdown" data-ffl="${tarea.fecha_limite_falsa}">${countdownHtml}</div>
+      <div id="countdown-${tarea.id}" class="task-countdown" data-ffl="${tarea.fecha_limite_falsa}">
+        <span class="countdown-icon">${renderCountdownIcon(tarea.id, tarea.fecha_limite_falsa)}</span>
+        <span class="countdown-text">${renderCountdownText(tarea.fecha_limite_falsa)}</span>
+      </div>
       <div class="task-alarm-info ${alarmClass}">
         <span>${alertLabel}</span>
       </div>
@@ -668,16 +694,21 @@ function formatCountdown(fechaLimiteFalsa) {
   return `${String(horas).padStart(2, '0')}h ${String(minutos).padStart(2, '0')}m`;
 }
 
-function renderCountdown(id, fechaLimiteFalsa) {
+function renderCountdownIcon(id, fechaLimiteFalsa) {
+  const ffl = new Date(fechaLimiteFalsa);
+  const ahora = new Date();
+  return ffl > ahora ? icon('hourglass') : icon('alert-triangle');
+}
+
+function renderCountdownText(fechaLimiteFalsa) {
   const ffl = new Date(fechaLimiteFalsa);
   const ahora = new Date();
   const diffMs = ffl - ahora;
 
   if (diffMs > 0) {
-    return `⏳ Faltan ${formatCountdown(fechaLimiteFalsa)}`;
+    return `Faltan ${formatCountdown(fechaLimiteFalsa)}`;
   }
-
-  return `⚠️ Vencida ${formatCountdown(fechaLimiteFalsa)}`;
+  return `Vencida ${formatCountdown(fechaLimiteFalsa)}`;
 }
 
 function updateAllCountdowns() {
@@ -685,8 +716,12 @@ function updateAllCountdowns() {
     document.querySelectorAll('[id^="countdown-"]').forEach(el => {
       const ffl = el.dataset.ffl;
       if (!ffl) return;
-      el.textContent = renderCountdown(el.id.replace('countdown-', ''), ffl);
+      const iconSpan = el.querySelector('.countdown-icon');
+      const textSpan = el.querySelector('.countdown-text');
+      if (iconSpan) iconSpan.innerHTML = renderCountdownIcon(el.id.replace('countdown-', ''), ffl);
+      if (textSpan) textSpan.textContent = renderCountdownText(ffl);
     });
+    renderIcons();
   } catch (err) {
     console.error('Error actualizando countdowns:', err);
   }
@@ -694,7 +729,6 @@ function updateAllCountdowns() {
 
 function renderCompletedCard(tarea) {
   const fReal = new Date(tarea.fecha_limite_real).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' });
-  const fFalsa = new Date(tarea.fecha_limite_falsa).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' });
 
   return `
     <div class="task-card border-safe">
@@ -702,22 +736,25 @@ function renderCompletedCard(tarea) {
         <h3 class="task-title">${escapeHTML(tarea.titulo)}</h3>
         <div class="task-header-right">
           <span class="task-status enviada">${tarea.estado}</span>
-          <button class="btn-delete" onclick="deleteTask(${tarea.id})" title="Eliminar tarea">🗑️</button>
+          <button class="btn-delete" onclick="deleteTask(${tarea.id})" title="Eliminar tarea">${icon('trash-2', 'icon-only')}</button>
         </div>
       </div>
       <p class="task-desc">${escapeHTML(tarea.descripcion || 'Sin descripción.')}</p>
       <div class="task-dates">
         <div class="date-block">
-          <strong>Límite Oficial:</strong>
-          <span>${fReal}</span>
-        </div>
-        <div class="date-block" style="color: var(--color-warning);">
-          <strong>Falsa Fecha Límite (FFL):</strong>
-          <span>${fFalsa}</span>
+          <strong>FFL</strong>
+          <span class="ffl-primary">${formatRelativeDate(tarea.fecha_limite_falsa)}</span>
+          <span class="real-trigger" tabindex="0" role="button" aria-label="Ver límite oficial">
+            ${icon('info')}
+            <span class="real-tooltip">
+            <span class="real-tooltip-label">Límite Oficial</span>
+            <span class="real-tooltip-date">${fReal}</span>
+          </span>
+          </span>
         </div>
       </div>
       <div class="task-actions">
-        <span style="color: #10b981; font-weight: 600; font-size: 0.85rem; text-align: center; width: 100%;">🛡️ Tarea entregada con éxito a tiempo. ¡Excelente!</span>
+        <span style="color: #10b981; font-weight: 600; font-size: 0.85rem; text-align: center; width: 100%;">${icon('shield-check')}Tarea entregada con éxito a tiempo. ¡Excelente!</span>
       </div>
     </div>
   `;
@@ -743,7 +780,7 @@ async function createTask(e) {
   setLoading(submitBtn, true);
 
   try {
-    const res = await apiFetch(`${API_BASE}/tareas`, {
+    const res = await apiFetch(`${CONFIG.API_BASE}/tareas`, {
       method: 'POST',
       body: JSON.stringify({
         titulo,
@@ -788,7 +825,7 @@ window.updateTaskStatus = async function(id, nuevoEstado) {
   const estadoFinal = nuevoEstado === 'En Enviada' ? 'Enviada' : nuevoEstado;
 
   try {
-    const res = await apiFetch(`${API_BASE}/tareas/${id}/estado`, {
+    const res = await apiFetch(`${CONFIG.API_BASE}/tareas/${id}/estado`, {
       method: 'PUT',
       body: JSON.stringify({ nuevoEstado: estadoFinal })
     });
@@ -797,12 +834,12 @@ window.updateTaskStatus = async function(id, nuevoEstado) {
     const data = await res.json();
 
     if (!res.ok) {
-      showToast(`⚠️ ${data.error}`, 'error');
+      showToast(`${data.error}`, 'error');
       return;
     }
 
     fetchTasks();
-    showToast(`✅ ${data.mensaje}`, 'success');
+    showToast(`${data.mensaje}`, 'success');
   } catch (err) {
     showToast(`Error: ${err.message}`, 'error');
   }
@@ -826,7 +863,7 @@ function evaluateGlobalAlarms(tareas) {
 
     if (nivelActual === 'Alto (Crítico)' || nivelActual === '¡MÁXIMO PELIGRO (CRÍTICO)!') {
       sendNativeNotification(
-        `⚠️ "${t.titulo}" — ${nivelActual}. Te quedan menos de 1 hora para tu Falsa Fecha Límite. ¡Entrega YA!`,
+        `"${t.titulo}" — ${nivelActual}. Te quedan menos de 1 hora para tu Falsa Fecha Límite. ¡Entrega YA!`,
         t.id
       );
     }
@@ -855,7 +892,7 @@ function evaluateGlobalAlarms(tareas) {
 
 async function fetchConfig() {
   try {
-    const res = await apiFetch(`${API_BASE}/configuracion`);
+    const res = await apiFetch(`${CONFIG.API_BASE}/configuracion`);
     if (!res) return;
     const data = await res.json();
     document.getElementById('margin-input').value = data.margen_horas;
@@ -870,7 +907,7 @@ async function updateMarginHours() {
   const margenHoras = parseInt(input.value, 10);
 
   if (isNaN(margenHoras) || margenHoras < 1 || margenHoras > 72) {
-    feedback.textContent = '❌ Ingresa un valor entre 1 y 72 horas.';
+    feedback.textContent = 'Ingresa un valor entre 1 y 72 horas.';
     feedback.className = 'margin-feedback error';
     return;
   }
@@ -879,7 +916,7 @@ async function updateMarginHours() {
   setLoading(saveBtn, true);
 
   try {
-    const res = await apiFetch(`${API_BASE}/configuracion`, {
+    const res = await apiFetch(`${CONFIG.API_BASE}/configuracion`, {
       method: 'PUT',
       body: JSON.stringify({ margen_horas: margenHoras })
     });
@@ -906,7 +943,7 @@ window.deleteTask = async function(id) {
   if (!confirm('¿Estás seguro de eliminar esta tarea permanentemente?')) return;
 
   try {
-    const res = await apiFetch(`${API_BASE}/tareas/${id}`, {
+    const res = await apiFetch(`${CONFIG.API_BASE}/tareas/${id}`, {
       method: 'DELETE'
     });
     if (!res) return;
@@ -922,13 +959,22 @@ window.deleteTask = async function(id) {
   }
 };
 
-async function requestNotificationPermission() {
+function updateNotifBtn() {
   const btn = document.getElementById('notif-permit-btn');
+  if (notificationsEnabled) {
+    btn.innerHTML = `${icon('bell')}Activadas`;
+    btn.classList.add('notif-active');
+  } else {
+    btn.innerHTML = icon('bell', 'icon-only');
+    btn.classList.remove('notif-active');
+  }
+  renderIcons();
+}
 
+async function requestNotificationPermission() {
   if (notificationsEnabled) {
     notificationsEnabled = false;
-    btn.textContent = '🔔';
-    btn.classList.remove('notif-active');
+    updateNotifBtn();
     return;
   }
 
@@ -944,16 +990,14 @@ async function requestNotificationPermission() {
 
   if (Notification.permission === 'granted') {
     notificationsEnabled = true;
-    btn.textContent = '🔔 Activadas';
-    btn.classList.add('notif-active');
+    updateNotifBtn();
     return;
   }
 
   const permission = await Notification.requestPermission();
   if (permission === 'granted') {
     notificationsEnabled = true;
-    btn.textContent = '🔔 Activadas';
-    btn.classList.add('notif-active');
+    updateNotifBtn();
   }
 }
 
@@ -964,7 +1008,7 @@ function sendNativeNotification(titulo, tareaId) {
   notifiedTasks.add(tareaId);
 
   try {
-    const notif = new Notification('🚨 Alarma Anti-Procrastinación', {
+    const notif = new Notification('Alarma Anti-Procrastinación', {
       body: titulo,
       icon: '/icons/icon-192.svg',
       badge: '/icons/icon-192.svg',
@@ -980,6 +1024,59 @@ function sendNativeNotification(titulo, tareaId) {
   } catch (err) {
     console.warn('No se pudo enviar la notificación nativa:', err.message);
   }
+}
+
+/* ---- ANALYTICS / DASHBOARD ---- */
+
+function initAnalytics() {
+  const details = document.querySelector('.analytics-details');
+  if (!details || details._analyticsInit) return;
+  details._analyticsInit = true;
+  details.addEventListener('toggle', () => {
+    if (details.open) {
+      fetchAnalytics();
+    }
+  });
+}
+
+async function fetchAnalytics() {
+  const grid = document.getElementById('analytics-grid');
+  grid.innerHTML = '<p class="stat-label" style="text-align:center;padding:20px;">Cargando metricas...</p>';
+
+  try {
+    const res = await apiFetch(`${CONFIG.API_BASE}/analytics`);
+    if (!res) return;
+    const data = await res.json();
+    renderAnalytics(data);
+  } catch (err) {
+    grid.innerHTML = '<p class="stat-label" style="text-align:center;padding:20px;color:var(--color-panic);">Error al cargar metricas.</p>';
+  }
+}
+
+function renderAnalytics(d) {
+  const grid = document.getElementById('analytics-grid');
+
+  const cards = [
+    { label: 'Total Tareas', value: d.totalTareas, color: 'cyan' },
+    { label: 'Completadas a Tiempo', value: d.onTime, color: 'green', extra: `${d.tasaExito}% exito` },
+    { label: 'Completadas tarde', value: d.lateFFL, color: 'yellow' },
+    { label: 'Vencidas', value: d.overdue, color: 'red' },
+    { label: 'Racha actual', value: `${d.streak}`, color: 'magenta', extra: d.streak === 1 ? 'entrega' : 'entregas' },
+    { label: 'Promedio entrega', value: `${d.promedioHorasAntes}h`, color: 'cyan', extra: 'antes de FFL' },
+    { label: 'Pendientes', value: d.pendientes, color: 'yellow' },
+    { label: 'En Progreso', value: d.enProgreso, color: 'orange' },
+    { label: 'Criticas ( < 1h )', value: d.tareasCriticas, color: 'red' }
+  ];
+
+  grid.innerHTML = cards.map(c => `
+    <div class="stat-card stat-${c.color}">
+      <div class="stat-value">${c.value}</div>
+      <div class="stat-label">${c.label}</div>
+      ${c.extra ? `<div class="stat-label" style="font-size:0.65rem;margin-top:2px;">${c.extra}</div>` : ''}
+    </div>
+  `).join('');
+
+  renderIcons();
 }
 
 function escapeHTML(str) {

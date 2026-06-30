@@ -10,6 +10,7 @@ services:
       MYSQL_DATABASE: alarma_db
       MYSQL_USER: alarma_user
       MYSQL_PASSWORD: alarma_pass_sec_2026
+      TZ: America/Lima
     ports:
       - "3307:3306"
     volumes:

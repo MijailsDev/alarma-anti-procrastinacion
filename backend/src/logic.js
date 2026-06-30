@@ -36,14 +36,14 @@ export function calcularAlarma(fechaLimiteFalsa, estado) {
     };
   } else if (diferenciaHoras > 0 && diferenciaHoras <= 1) {
     return {
-      nivel: 'Alto (Critico)',
+      nivel: 'Alto (Crítico)',
       color: '#fd7e14',
       frecuenciaSegundos: 60,
       mensaje: 'URGENTE! Te queda menos de 1 hora para tu Falsa Fecha Limite.'
     };
   } else {
     return {
-      nivel: 'MAXIMO PELIGRO (CRITICO)!',
+      nivel: '¡MÁXIMO PELIGRO (CRÍTICO)!',
       color: '#dc3545',
       frecuenciaSegundos: 5,
       mensaje: 'ALERTA AGRESIVA! Has superado tu Falsa Fecha Limite y la tarea NO ha sido enviada. ENTREGA YA!'

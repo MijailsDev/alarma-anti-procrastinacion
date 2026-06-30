@@ -40,6 +40,8 @@ self.addEventListener('fetch', (e) => {
   const { request } = e;
   const url = new URL(request.url);
 
+  if (url.origin !== self.location.origin) return;
+
   if (url.pathname.startsWith('/api/')) {
     if (request.method === 'GET') {
       e.respondWith(networkFirstWithCache(request));
@@ -127,7 +129,7 @@ async function queueTask(task) {
 
 self.addEventListener('push', (e) => {
   let data = {
-    title: 'ALARMA DE ENTREGA CRITICA!',
+    title: 'Alarma Anti-Procrastinacion',
     body: 'Has superado tu Falsa Fecha Limite. Entrega de inmediato al aula virtual!',
     icon: '/icons/icon-192.svg',
     vibrate: [300, 100, 300, 100, 500, 100, 500],

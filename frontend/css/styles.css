@@ -202,6 +202,25 @@ body.high-contrast.light-mode {
   border-radius: 6px;
 }
 
+/* === LUCIDE ICONS === */
+.icon-inline {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  vertical-align: middle;
+  margin-right: 0.3em;
+  stroke-width: 2;
+}
+
+.icon-only {
+  margin-right: 0;
+}
+
+.icon-lg {
+  width: 1.4em;
+  height: 1.4em;
+}
+
 /* === FOCUS / KEYBOARD === */
 :focus-visible {
   outline: 2px solid var(--accent-cyan);
@@ -289,7 +308,6 @@ body {
 }
 
 .pulse-icon {
-  font-size: 1.4rem;
   animation: heartbeat 0.6s infinite alternate;
 }
 
@@ -342,7 +360,7 @@ body {
 }
 
 .logo-emoji {
-  font-size: 1.8rem;
+  color: var(--accent-cyan);
 }
 
 .student-badge {
@@ -361,37 +379,24 @@ body {
   gap: 10px;
 }
 
-.btn-theme-toggle {
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  cursor: pointer;
-  font-size: 1.2rem;
-  padding: 6px 10px;
-  border-radius: 10px;
-  transition: all 0.2s;
-  line-height: 1;
-  color: var(--text-muted);
-}
-
-.btn-theme-toggle:hover {
-  background: var(--accent-cyan);
-  border-color: var(--accent-cyan);
-  color: #1a1b26;
-  transform: scale(1.08);
-  box-shadow: var(--glow-effect);
-}
-
+.btn-theme-toggle,
+.btn-contrast-toggle,
 .btn-notif-permit {
   background: none;
   border: 1px solid var(--border);
   cursor: pointer;
-  font-size: 1.1rem;
   padding: 6px 8px;
   border-radius: 8px;
   transition: all 0.2s;
   line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
 }
 
+.btn-theme-toggle:hover,
+.btn-contrast-toggle:hover,
 .btn-notif-permit:hover {
   background-color: var(--bg-elevated);
   border-color: var(--accent-cyan);
@@ -644,9 +649,6 @@ body {
 }
 
 .task-dates {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
   background: var(--bg-elevated);
   padding: 10px;
   border-radius: 6px;
@@ -654,17 +656,84 @@ body {
   font-family: 'JetBrains Mono', monospace;
 }
 
+.date-block {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .date-block strong {
-  display: block;
   font-size: 0.7rem;
   text-transform: uppercase;
   color: var(--text-label);
-  margin-bottom: 2px;
   letter-spacing: 0.5px;
+  white-space: nowrap;
 }
 
 .date-block span {
   color: var(--text-main);
+}
+
+.ffl-primary {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--accent-cyan);
+  letter-spacing: 0.3px;
+}
+
+.real-trigger {
+  position: relative;
+  cursor: pointer;
+  color: var(--text-muted);
+  opacity: 0.5;
+  transition: opacity 0.2s, color 0.2s;
+  display: inline-flex;
+  align-items: center;
+  margin-left: auto;
+  line-height: 1;
+}
+
+.real-trigger:hover,
+.real-trigger:focus-visible {
+  opacity: 1;
+  color: var(--accent-cyan);
+}
+
+.real-tooltip {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  padding: 10px 16px;
+  border-radius: 8px;
+  box-shadow: var(--shadow-lg);
+  z-index: 10;
+  text-align: center;
+  min-width: 130px;
+}
+
+.real-tooltip-label {
+  display: block;
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+}
+
+.real-tooltip-date {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--accent-cyan);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.real-trigger:hover .real-tooltip,
+.real-trigger:focus-visible .real-tooltip {
+  display: block;
 }
 
 .task-countdown {
@@ -843,16 +912,17 @@ body {
   background: none;
   border: none;
   cursor: pointer;
-  font-size: 1.05rem;
   padding: 4px 6px;
   border-radius: 4px;
   transition: all 0.2s;
   opacity: 0.5;
   line-height: 1;
+  color: var(--text-muted);
 }
 
 .btn-delete:hover {
   opacity: 1;
+  color: var(--color-panic);
   background-color: rgba(239, 68, 68, 0.2);
 }
 
@@ -861,6 +931,90 @@ body {
   padding: 40px 20px;
   color: var(--text-muted);
 }
+
+.analytics-section {
+  max-width: 1200px;
+  margin: 20px auto;
+  padding: 0 20px;
+}
+
+.analytics-details {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+}
+
+.analytics-summary {
+  padding: 16px 24px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: background-color 0.2s;
+  color: var(--accent-cyan);
+  letter-spacing: 0.5px;
+}
+
+.analytics-summary:hover {
+  background-color: var(--bg-elevated);
+}
+
+.analytics-summary::-webkit-details-marker {
+  color: var(--text-muted);
+}
+
+.analytics-details[open] .analytics-summary {
+  border-bottom: 1px solid var(--border-card);
+}
+
+.analytics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px;
+  padding: 20px 24px;
+}
+
+.stat-card {
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  text-align: center;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.stat-card:hover {
+  border-color: var(--accent-cyan);
+  box-shadow: var(--glow-effect);
+}
+
+.stat-value {
+  font-size: 2rem;
+  font-weight: 800;
+  font-family: 'JetBrains Mono', monospace;
+  line-height: 1.2;
+  margin-bottom: 4px;
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.stat-green .stat-value { color: var(--color-safe); }
+.stat-yellow .stat-value { color: var(--color-warning); }
+.stat-orange .stat-value { color: var(--color-danger); }
+.stat-red .stat-value { color: var(--color-panic); }
+.stat-cyan .stat-value { color: var(--accent-cyan); }
+.stat-magenta .stat-value { color: var(--accent-magenta); }
 
 .history-section {
   max-width: 1200px;
@@ -1009,9 +1163,9 @@ body {
 }
 
 .auth-logo {
-  font-size: 2.5rem;
   display: block;
   margin-bottom: 8px;
+  color: var(--accent-cyan);
 }
 
 .auth-header h1 {

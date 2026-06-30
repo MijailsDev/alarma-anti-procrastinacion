@@ -18,7 +18,7 @@
   <div id="auth-container" class="auth-container">
     <div class="auth-box">
       <div class="auth-header">
-        <span class="auth-logo">⏱️</span>
+        <span class="auth-logo"><i data-lucide="clock" class="icon-inline icon-lg"></i></span>
         <h1>Alarma Anti-Procrastinación</h1>
         <p class="auth-subtitle">Inicia sesión para gestionar tus tareas</p>
       </div>
@@ -62,7 +62,7 @@
     <!-- Alerta Global de Pánico -->
     <div id="global-panic-bar" class="panic-hidden">
       <div class="panic-content">
-        <span class="pulse-icon">🚨</span>
+        <i data-lucide="triangle-alert" class="icon-inline pulse-icon"></i>
         <strong>¡MÁXIMO PELIGRO!</strong> Tienes tareas con Falsa Fecha Límite superada. ¡Sube el volumen y entrega YA!
         <button id="silence-btn">Silenciar Temporalmente</button>
       </div>
@@ -70,15 +70,15 @@
 
     <header class="app-header">
       <div class="header-logo">
-        <span class="logo-emoji">⏱️</span>
+        <i data-lucide="clock" class="icon-inline icon-lg logo-emoji"></i>
         <h1>Alarma Anti-Procrastinación</h1>
       </div>
       <div class="header-actions" role="toolbar" aria-label="Acciones de la aplicación">
         <span id="user-badge" class="student-badge" aria-live="polite"></span>
-        <button id="theme-toggle" class="btn-theme-toggle" title="Cambiar tema" aria-label="Cambiar entre tema oscuro y claro">🌙</button>
-        <button id="contrast-toggle" class="btn-contrast-toggle" title="Activar alto contraste" aria-label="Activar modo de alto contraste">🔲</button>
-        <button id="notif-permit-btn" class="btn-notif-permit" title="Activar notificaciones del sistema" aria-label="Activar o desactivar notificaciones">🔔</button>
-        <button id="logout-btn" class="btn-logout" title="Cerrar sesión" aria-label="Cerrar sesión">🚪 Salir</button>
+        <button id="theme-toggle" class="btn-theme-toggle" title="Cambiar tema" aria-label="Cambiar entre tema oscuro y claro"><i data-lucide="moon" class="icon-inline icon-only"></i></button>
+        <button id="contrast-toggle" class="btn-contrast-toggle" title="Activar alto contraste" aria-label="Activar modo de alto contraste"><i data-lucide="contrast" class="icon-inline icon-only"></i></button>
+        <button id="notif-permit-btn" class="btn-notif-permit" title="Activar notificaciones del sistema" aria-label="Activar o desactivar notificaciones"><i data-lucide="bell" class="icon-inline icon-only"></i></button>
+        <button id="logout-btn" class="btn-logout" title="Cerrar sesión" aria-label="Cerrar sesión"><i data-lucide="log-out" class="icon-inline"></i>Salir</button>
       </div>
     </header>
 
@@ -86,7 +86,7 @@
 
       <!-- Panel Izquierdo: Formulario de Nueva Tarea -->
       <section class="panel panel-form">
-        <h2 class="panel-title">⏱️ Registrar Nueva Tarea</h2>
+        <h2 class="panel-title"><i data-lucide="clock" class="icon-inline"></i>Registrar Nueva Tarea</h2>
         <p class="panel-subtitle">El sistema calculará automáticamente tu Falsa Fecha Límite (FFL) restando las horas de colchón al límite real.</p>
 
         <form id="task-form">
@@ -105,11 +105,11 @@
             <input type="datetime-local" id="task-deadline" required>
           </div>
 
-          <button type="submit" class="btn btn-submit">Crear Tarea con Blindaje FFL 🛡️</button>
+          <button type="submit" class="btn btn-submit"><i data-lucide="shield-check" class="icon-inline"></i>Crear Tarea con Blindaje FFL</button>
         </form>
 
         <div class="config-section">
-          <h2 class="panel-title">⚙️ Margen FFL</h2>
+          <h2 class="panel-title"><i data-lucide="settings" class="icon-inline"></i>Margen FFL</h2>
           <p class="panel-subtitle">Ajusta el colchón de horas que se resta a la fecha límite real para crear tu Falsa Fecha Límite.</p>
           <div class="config-row">
             <label for="margin-input">Horas de colchón:</label>
@@ -123,8 +123,8 @@
       <!-- Panel Derecho: Listado de Tareas -->
       <section class="panel panel-tasks">
         <div class="panel-header-actions">
-          <h2 class="panel-title">📋 Mi Cronograma Estricto</h2>
-          <button id="refresh-tasks" class="btn btn-secondary">🔄 Recargar</button>
+          <h2 class="panel-title"><i data-lucide="clipboard-list" class="icon-inline"></i>Mi Cronograma Estricto</h2>
+          <button id="refresh-tasks" class="btn btn-secondary"><i data-lucide="refresh-cw" class="icon-inline"></i>Recargar</button>
         </div>
 
         <div class="legend">
@@ -166,10 +166,19 @@
 
     </main>
 
+    <section class="analytics-section">
+      <details class="analytics-details">
+        <summary class="analytics-summary">
+          <i data-lucide="bar-chart-3" class="icon-inline"></i>Dashboard de Rendimiento
+        </summary>
+        <div id="analytics-grid" class="analytics-grid"></div>
+      </details>
+    </section>
+
     <section class="history-section">
       <details class="history-details">
         <summary class="history-summary">
-          📜 Historial de Tareas Completadas
+          <i data-lucide="scroll-text" class="icon-inline"></i>Historial de Tareas Completadas
           <span id="history-count" class="history-count">0</span>
         </summary>
         <div id="history-list" class="tasks-grid"></div>
@@ -182,6 +191,7 @@
 
   </div>
 
+  <script src="https://unpkg.com/lucide@latest" defer></script>
   <script src="js/app.js" type="module"></script>
 </body>
 </html>

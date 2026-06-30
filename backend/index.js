@@ -33,7 +33,8 @@ const dbConfig = {
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
-  charset: 'utf8mb4'
+  charset: 'utf8mb4',
+  timezone: 'Z'
 };
 
 let pool;
@@ -374,6 +375,81 @@ app.get('/api/alarmas', authenticateToken, tryCatch(async (req, res) => {
   res.json({
     alertasActivas: alarmasDisparadas,
     alarmaCriticaDominante: maximaGravedad
+  });
+}));
+
+// --- ANALYTICS / DASHBOARD ---
+
+app.get('/api/analytics', authenticateToken, tryCatch(async (req, res) => {
+  const userId = req.usuarioId;
+
+  const [totalRows] = await pool.query('SELECT COUNT(*) as count FROM tareas WHERE usuario_id = ?', [userId]);
+  const totalTareas = totalRows[0].count;
+
+  const [statusRows] = await pool.query(
+    'SELECT estado, COUNT(*) as count FROM tareas WHERE usuario_id = ? GROUP BY estado',
+    [userId]
+  );
+
+  const getStatusCount = (estado) => {
+    const row = statusRows.find(r => r.estado === estado);
+    return row ? row.count : 0;
+  };
+
+  const [completadas] = await pool.query(
+    `SELECT updated_at, fecha_limite_falsa, fecha_limite_real
+     FROM tareas
+     WHERE usuario_id = ? AND estado = 'Enviada'
+     ORDER BY updated_at DESC`,
+    [userId]
+  );
+
+  let onTime = 0, lateFFL = 0, overdue = 0, streak = 0;
+  let totalHoursEarly = 0;
+
+  for (const t of completadas) {
+    const completedAt = new Date(t.updated_at);
+    const ffl = new Date(t.fecha_limite_falsa);
+    const real = new Date(t.fecha_limite_real);
+
+    if (completedAt <= ffl) {
+      onTime++;
+      totalHoursEarly += (ffl - completedAt) / (1000 * 60 * 60);
+    } else if (completedAt <= real) {
+      lateFFL++;
+    } else {
+      overdue++;
+    }
+  }
+
+  for (const t of completadas) {
+    const completedAt = new Date(t.updated_at);
+    const ffl = new Date(t.fecha_limite_falsa);
+    if (completedAt <= ffl) streak++;
+    else break;
+  }
+
+  const [criticalRows] = await pool.query(
+    `SELECT COUNT(*) as count FROM tareas
+     WHERE usuario_id = ? AND estado != 'Enviada'
+     AND fecha_limite_falsa <= DATE_ADD(NOW(), INTERVAL 1 HOUR)`,
+    [userId]
+  );
+
+  const tasaExito = completadas.length > 0 ? Math.round((onTime / completadas.length) * 100) : 0;
+
+  res.json({
+    totalTareas,
+    totalCompletadas: completadas.length,
+    onTime,
+    lateFFL,
+    overdue,
+    pendientes: getStatusCount('Pendiente'),
+    enProgreso: getStatusCount('En Progreso'),
+    streak,
+    promedioHorasAntes: onTime > 0 ? Math.round((totalHoursEarly / onTime) * 10) / 10 : 0,
+    tareasCriticas: criticalRows[0].count,
+    tasaExito
   });
 }));
 
