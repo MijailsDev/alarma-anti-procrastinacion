@@ -1,55 +1,47 @@
--- Crear la base de datos si no existe (normalmente docker-compose lo hace con MYSQL_DATABASE)
-CREATE DATABASE IF NOT EXISTS `alarma_db` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE `alarma_db`;
+PRAGMA foreign_keys = ON;
 
--- Tabla de Usuarios
-CREATE TABLE IF NOT EXISTS `usuarios` (
-    `id` INT AUTO_INCREMENT PRIMARY KEY,
-    `username` VARCHAR(50) NOT NULL UNIQUE,
-    `email` VARCHAR(100) NOT NULL UNIQUE,
-    `password_hash` VARCHAR(255) NOT NULL,
-    `margen_horas` INT DEFAULT 5 NOT NULL,
-    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS usuarios (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL UNIQUE,
+    email TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    margen_horas INTEGER DEFAULT 5 NOT NULL,
+    created_at TEXT DEFAULT (datetime('now'))
+);
 
--- Tabla de Tareas
-CREATE TABLE IF NOT EXISTS `tareas` (
-    `id` INT AUTO_INCREMENT PRIMARY KEY,
-    `usuario_id` INT NOT NULL,
-    `titulo` VARCHAR(100) NOT NULL,
-    `descripcion` TEXT,
-    `fecha_limite_real` DATETIME NOT NULL,
-    `fecha_limite_falsa` DATETIME NOT NULL,
-    `estado` ENUM('Pendiente', 'En Progreso', 'Enviada') DEFAULT 'Pendiente' NOT NULL,
-    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (`usuario_id`) REFERENCES `usuarios`(`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS tareas (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    usuario_id INTEGER NOT NULL,
+    titulo TEXT NOT NULL,
+    descripcion TEXT,
+    fecha_limite_real TEXT NOT NULL,
+    fecha_limite_falsa TEXT NOT NULL,
+    estado TEXT DEFAULT 'Pendiente' NOT NULL CHECK(estado IN ('Pendiente', 'En Progreso', 'Enviada')),
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
+);
 
--- Migración para BD existentes: renombrar password a password_hash
--- ALTER TABLE usuarios CHANGE COLUMN password password_hash VARCHAR(255) NOT NULL;
+CREATE TABLE IF NOT EXISTS refresh_tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    token TEXT NOT NULL UNIQUE,
+    expires_at TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (user_id) REFERENCES usuarios(id) ON DELETE CASCADE
+);
 
--- Tabla de Refresh Tokens
-CREATE TABLE IF NOT EXISTS `refresh_tokens` (
-    `id` INT AUTO_INCREMENT PRIMARY KEY,
-    `user_id` INT NOT NULL,
-    `token` VARCHAR(80) NOT NULL UNIQUE,
-    `expires_at` DATETIME NOT NULL,
-    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (`user_id`) REFERENCES `usuarios`(`id`) ON DELETE CASCADE,
-    INDEX `idx_token` (`token`),
-    INDEX `idx_expires` (`expires_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE INDEX IF NOT EXISTS idx_refresh_token ON refresh_tokens(token);
+CREATE INDEX IF NOT EXISTS idx_refresh_expires ON refresh_tokens(expires_at);
 
--- Seed: usuario de prueba con contraseña hasheada (unamad2026 con bcrypt)
-INSERT INTO `usuarios` (`id`, `username`, `email`, `password_hash`, `margen_horas`)
-VALUES (1, 'estudiante_unamad', 'sistemas.unamad@gmail.com', '$2b$10$st.r8pI5QUnyQPbnvQxksODN7uz1D5tOQpmvickgulDMnH3A7Bkha', 5)
-ON DUPLICATE KEY UPDATE `id`=`id`;
+INSERT OR IGNORE INTO usuarios (id, username, email, password_hash, margen_horas)
+VALUES (1, 'estudiante_unamad', 'sistemas.unamad@gmail.com', '$2b$10$st.r8pI5QUnyQPbnvQxksODN7uz1D5tOQpmvickgulDMnH3A7Bkha', 5);
 
--- Insertar tareas de prueba vinculadas al usuario
-INSERT INTO `tareas` (`usuario_id`, `titulo`, `descripcion`, `fecha_limite_real`, `fecha_limite_falsa`, `estado`)
+INSERT INTO tareas (usuario_id, titulo, descripcion, fecha_limite_real, fecha_limite_falsa, estado)
 VALUES
-(1, 'Proyecto Final de Ingeniería de Software', 'Entregar el prototipo final con arquitectura limpia en Docker.', DATE_ADD(NOW(), INTERVAL 10 HOUR), DATE_ADD(NOW(), INTERVAL 5 HOUR), 'Pendiente'),
-(1, 'Examen Parcial de Base de Datos II', 'Resolver los ejercicios prácticos de normalización y triggers.', DATE_ADD(NOW(), INTERVAL 2 HOUR), DATE_SUB(NOW(), INTERVAL 3 HOUR), 'En Progreso'),
-(1, 'Laboratorio de Redes y Telecomunicaciones', 'Configurar el enrutamiento dinámico OSPF en Cisco Packet Tracer.', DATE_ADD(NOW(), INTERVAL 24 HOUR), DATE_ADD(NOW(), INTERVAL 19 HOUR), 'Enviada')
-ON DUPLICATE KEY UPDATE `id`=`id`;
+(1, 'Proyecto Final de Ingeniería de Software', 'Entregar el prototipo final con arquitectura limpia en Docker.',
+ datetime('now', '+10 hours'), datetime('now', '+5 hours'), 'Pendiente'),
+(1, 'Examen Parcial de Base de Datos II', 'Resolver los ejercicios prácticos de normalización y triggers.',
+ datetime('now', '+2 hours'), datetime('now', '-3 hours'), 'En Progreso'),
+(1, 'Laboratorio de Redes y Telecomunicaciones', 'Configurar el enrutamiento dinámico OSPF en Cisco Packet Tracer.',
+ datetime('now', '+24 hours'), datetime('now', '+19 hours'), 'Enviada');

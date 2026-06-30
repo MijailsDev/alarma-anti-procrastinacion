@@ -10,3 +10,12 @@ __pycache__/
 
 # Volumen de la base de datos de Docker
 db_data/
+
+# Archivos de respaldo de la base de datos
+backup_rescate.sql
+
+# SQLite database files
+*.db
+*.db-journal
+*.db-wal
+*.db-shm

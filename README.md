@@ -14,7 +14,7 @@ La solución combina un cálculo automatizado de plazos simulados, una máquina 
 
 ## 🏗️ 2. Arquitectura de Software
 
-El sistema utiliza una arquitectura desacoplada y contenerizada mediante **Docker** y **Docker Compose**, lo que garantiza portabilidad y aislamiento en entornos Windows 11 con WSL (Ubuntu).
+El sistema utiliza una arquitectura desacoplada: backend Node.js/Express con SQLite, frontend PWA. Puede ejecutarse con Docker o localmente sin dependencia de servidor de base de datos externo.
 
 ```
  ┌─────────────────────────────────────────────────────────┐
@@ -31,25 +31,24 @@ El sistema utiliza una arquitectura desacoplada y contenerizada mediante **Docke
  │          Worker ligero de escaneo en background         │
  └───────────────────────────┬─────────────────────────────┘
                              │
-                             │ (mysql2 / Pool de Conexiones)
-                             ▼
+                              │ (better-sqlite3)
+                              ▼
  ┌─────────────────────────────────────────────────────────┐
- │                 BASE DE DATOS (MySQL 8.0)               │
+ │              BASE DE DATOS (SQLite 3 / WAL)             │
  │                Esquema relacional estricto              │
  └─────────────────────────────────────────────────────────┘
 ```
 
 ### Componentes y Puertos Configurados
 
-1. **Base de Datos (MySQL 8.0):**
-   - **Servicio Docker:** `db`
-   - **Puerto Interno:** `3306` | **Puerto Externo (Expueto):** `3307`
-   - **Características:** Persistencia mediante un volumen de datos Docker (`db_data`) y carga automática del script DDL (`schema.sql`) para inicialización de tablas y seeders al levantar el contenedor por primera vez.
+1. **Base de Datos (SQLite 3 con modo WAL):**
+   - **Archivo de base de datos:** `backend/data/alarma.db` (creado automáticamente al arrancar el backend)
+   - **Características:** Sin servidor, sin configuración de usuario/contraseña. Esquema inicializado automáticamente desde `database/schema.sql` en cada arranque. Persistencia mediante el volumen Docker `db_data:/usr/src/app/data`.
 
 2. **Backend (Node.js 18-Alpine & Express):**
    - **Servicio Docker:** `app`
    - **Puerto de Escucha:** `3000` (Expuesto y mapeado `3000:3000`)
-   - **Características:** Uso nativo de Módulos de JavaScript (`"type": "module"`), recarga en vivo durante el desarrollo mediante `nodemon`, pool de conexiones de promesas (`mysql2/promise`) y un micro-worker interno (`setInterval`) que monitorea y alerta sobre tareas procrastinadas cada 15 segundos en la consola del servidor.
+   - **Características:** Uso nativo de Módulos de JavaScript (`"type": "module"`), recarga en vivo durante el desarrollo mediante `nodemon`, acceso síncrono a SQLite mediante `better-sqlite3` y un micro-worker interno (`setInterval`) que monitorea y alerta sobre tareas procrastinadas cada 15 segundos en la consola del servidor.
 
 3. **Frontend PWA (Cliente Estático):**
    - **Puerto de Servicio:** `5000` (Levantado mediante servidor local ultra-ligero)
@@ -61,15 +60,22 @@ El sistema utiliza una arquitectura desacoplada y contenerizada mediante **Docke
 
 Sigue las siguientes instrucciones dentro de tu entorno **WSL (Ubuntu)** en Windows 11 para levantar los servicios desde cero:
 
-### Paso 1: Levantar los contenedores de Docker
-Dirígete a la carpeta raíz del proyecto y levanta el entorno contenerizado. Esto compilará el backend, descargará MySQL 8.0 y ejecutará el script SQL de inicialización de forma automática:
+### Paso 1: Iniciar el Backend (Docker)
 ```bash
 cd /home/caffe/proyectos/alarma-anti-procrastinacion
 docker compose up -d
 ```
-*Para verificar que los contenedores están corriendo y con buena salud, puedes ejecutar:*
+*Para verificar que el contenedor está corriendo:*
 ```bash
 docker compose ps
+```
+
+### Paso 1b: Iniciar el Backend (Local, sin Docker)
+```bash
+cd /home/caffe/proyectos/alarma-anti-procrastinacion/backend
+cp .env.example .env
+npm install
+npm run dev
 ```
 
 ### Paso 2: Servir el Frontend
@@ -129,9 +135,12 @@ docker compose logs -f
 ```
 
 ### Resetear / Limpiar por completo la tabla de tareas
-Si deseas limpiar tu base de datos de pruebas o eliminar todas las tareas registradas para empezar un nuevo ciclo académico limpio, ejecuta el siguiente comando SQL directamente en el contenedor de base de datos MySQL mediante `docker exec` (sin necesidad de entrar de manera interactiva):
 ```bash
-docker exec -it alarma_db mysql -u alarma_user -palarma_pass_sec_2026 -e "USE alarma_db; TRUNCATE TABLE tareas;"
+# Con Docker:
+docker compose exec app rm -f /usr/src/app/data/alarma.db
+# Sin Docker (local):
+rm -f backend/data/alarma.db
+# Al reiniciar el backend, SQLite recreará el archivo con las tablas vacías automáticamente.
 ```
 
 ### Apagar los servicios de Docker liberando recursos
@@ -139,4 +148,4 @@ Cuando no estés estudiando y desees detener el entorno de desarrollo por comple
 ```bash
 docker compose down
 ```
-*(Los datos de la base de datos se mantendrán seguros e intactos gracias al volumen persistente `db_data`)*.
+*(Los datos de la base de datos se mantendrán seguros e intactos gracias al volumen persistente `db_data`). Para borrar los datos por completo: `docker compose down -v`.*
