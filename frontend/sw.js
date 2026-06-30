@@ -128,54 +128,60 @@ async function queueTask(task) {
 }
 
 self.addEventListener('push', (e) => {
-  let data = {
-    title: 'Alarma Anti-Procrastinacion',
-    body: 'Has superado tu Falsa Fecha Limite. Entrega de inmediato al aula virtual!',
-    icon: '/icons/icon-192.svg',
-    vibrate: [300, 100, 300, 100, 500, 100, 500],
-    tag: 'alarma-agresiva',
-    requireInteraction: true
-  };
-
-  if (e.data) {
-    try {
-      const payload = e.data.json();
-      data = { ...data, ...payload };
-    } catch (err) {
-      data.body = e.data.text();
-    }
-  }
+  const payload = e.data ? e.data.json() : {};
+  const tareaId = payload.tareaId || null;
+  const title = payload.title || 'Acción requerida';
+  const body = payload.body || 'La Falsa Fecha Límite está por vencer. Revisa tus tareas pendientes.';
 
   e.waitUntil(
-    self.registration.showNotification(data.title, {
-      body: data.body,
-      icon: data.icon,
-      badge: data.icon,
-      vibrate: data.vibrate,
-      tag: data.tag,
-      requireInteraction: data.requireInteraction,
+    self.registration.showNotification(title, {
+      body,
+      icon: '/icons/icon-512.svg',
+      badge: '/icons/icon-192.svg',
+      data: { tareaId },
+      vibrate: [300, 100, 300],
+      tag: payload.tag || 'alarma-pendiente',
+      requireInteraction: true,
       actions: [
-        { action: 'open_app', title: 'Ver Mis Tareas' },
-        { action: 'silence', title: 'Silenciar' }
+        { action: 'complete', title: 'Completar' },
+        { action: 'snooze', title: 'Posponer' }
       ]
     })
   );
 });
 
+function sendActionToClient(action, tareaId) {
+  clients.matchAll({ type: 'window' }).then(clientList => {
+    for (const client of clientList) {
+      if ('postMessage' in client) {
+        client.postMessage({ type: 'notification-action', action, tareaId });
+      }
+    }
+  });
+}
+
 self.addEventListener('notificationclick', (e) => {
-  e.notification.close();
+  const notification = e.notification;
+  const tareaId = notification.data && notification.data.tareaId;
+  notification.close();
+
+  if (e.action === 'complete' && tareaId) {
+    e.waitUntil(sendActionToClient('complete', tareaId));
+    return;
+  }
+
+  if (e.action === 'snooze' && tareaId) {
+    e.waitUntil(sendActionToClient('snooze', tareaId));
+    return;
+  }
 
   if (e.action === 'open_app' || !e.action) {
     e.waitUntil(
-      clients.matchAll({ type: 'window' }).then((clientList) => {
+      clients.matchAll({ type: 'window' }).then(clientList => {
         for (const client of clientList) {
-          if (client.url === '/' && 'focus' in client) {
-            return client.focus();
-          }
+          if ('focus' in client) return client.focus();
         }
-        if (clients.openWindow) {
-          return clients.openWindow('/');
-        }
+        if (clients.openWindow) return clients.openWindow('/');
       })
     );
   }

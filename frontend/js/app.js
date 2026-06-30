@@ -5,9 +5,56 @@ let audioCtx = null;
 let alarmIntervalId = null;
 let isSilenced = false;
 let silenceTimeoutId = null;
+let monitorIntervalId = null;
 
-const notifiedTasks = new Set();
 let notificationsEnabled = false;
+
+const NOTIFIED_KEY = 'notified_tasks';
+const NOTIF_ENABLED_KEY = 'notif_enabled';
+
+function getNotifiedTasks() {
+  try {
+    return JSON.parse(localStorage.getItem(NOTIFIED_KEY)) || [];
+  } catch {
+    return [];
+  }
+}
+
+function saveNotifiedTasks(list) {
+  localStorage.setItem(NOTIFIED_KEY, JSON.stringify(list));
+}
+
+function isTaskNotified(taskId) {
+  return getNotifiedTasks().some(entry => entry.taskId === taskId);
+}
+
+function markTaskAsNotified(taskId) {
+  const list = getNotifiedTasks();
+  if (!list.some(entry => entry.taskId === taskId)) {
+    list.push({ taskId, date: Date.now() });
+    saveNotifiedTasks(list);
+  }
+}
+
+function cleanupNotifiedTasks() {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayMs = today.getTime();
+  const list = getNotifiedTasks().filter(entry => entry.date >= todayMs);
+  saveNotifiedTasks(list);
+}
+
+function startNotificationMonitor() {
+  stopNotificationMonitor();
+  monitorIntervalId = setInterval(() => fetchTasks(), 60000);
+}
+
+function stopNotificationMonitor() {
+  if (monitorIntervalId) {
+    clearInterval(monitorIntervalId);
+    monitorIntervalId = null;
+  }
+}
 
 /* ---- LUCIDE ICON HELPER ---- */
 function icon(name, extra = '') {
@@ -180,6 +227,7 @@ function showAuth() {
   document.getElementById('auth-container').style.display = 'flex';
   document.getElementById('app-container').style.display = 'none';
   stopAudioAlarmLoop();
+  stopNotificationMonitor();
   document.getElementById('global-panic-bar').classList.remove('panic-active');
   document.getElementById('global-panic-bar').classList.add('panic-hidden');
 }
@@ -415,6 +463,20 @@ function initAppEvents() {
   });
 }
 
+function silenceNotification() {
+  initAudio();
+  isSilenced = true;
+  stopAudioAlarmLoop();
+  document.getElementById('global-panic-bar').classList.remove('panic-active');
+  document.getElementById('global-panic-bar').classList.add('panic-hidden');
+
+  if (silenceTimeoutId) clearTimeout(silenceTimeoutId);
+  silenceTimeoutId = setTimeout(() => {
+    isSilenced = false;
+    fetchTasks();
+  }, 600000);
+}
+
 function silenceHandler() {
   initAudio();
   isSilenced = true;
@@ -430,9 +492,24 @@ function silenceHandler() {
 }
 
 function loadApp() {
+  cleanupNotifiedTasks();
   fetchTasks();
   fetchConfig();
   initAnalytics();
+  startNotificationMonitor();
+}
+
+function setupSWMessageListener() {
+  if (!navigator.serviceWorker) return;
+  navigator.serviceWorker.addEventListener('message', (e) => {
+    const { type, action, tareaId } = e.data;
+    if (type !== 'notification-action') return;
+    if (action === 'complete') {
+      window.updateTaskStatus(tareaId, 'Enviada');
+    } else if (action === 'snooze') {
+      silenceNotification();
+    }
+  });
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -440,6 +517,8 @@ document.addEventListener('DOMContentLoaded', () => {
   applySavedContrast();
   initAppEvents();
   registerServiceWorker();
+  setupSWMessageListener();
+  restoreNotifState();
   renderIcons();
 
   const token = getToken();
@@ -862,10 +941,7 @@ function evaluateGlobalAlarms(tareas) {
     }
 
     if (nivelActual === 'Alto (Crítico)' || nivelActual === '¡MÁXIMO PELIGRO (CRÍTICO)!') {
-      sendNativeNotification(
-        `"${t.titulo}" — ${nivelActual}. Te quedan menos de 1 hora para tu Falsa Fecha Límite. ¡Entrega YA!`,
-        t.id
-      );
+      sendNativeNotification(t);
     }
   });
 
@@ -940,23 +1016,23 @@ async function updateMarginHours() {
 }
 
 window.deleteTask = async function(id) {
-  if (!confirm('¿Estás seguro de eliminar esta tarea permanentemente?')) return;
+  showConfirmModal('¿Estás seguro de eliminar esta tarea permanentemente?', async () => {
+    try {
+      const res = await apiFetch(`${CONFIG.API_BASE}/tareas/${id}`, {
+        method: 'DELETE'
+      });
+      if (!res) return;
 
-  try {
-    const res = await apiFetch(`${CONFIG.API_BASE}/tareas/${id}`, {
-      method: 'DELETE'
-    });
-    if (!res) return;
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || 'No se pudo eliminar la tarea');
+      }
 
-    if (!res.ok) {
-      const errData = await res.json();
-      throw new Error(errData.error || 'No se pudo eliminar la tarea');
+      fetchTasks();
+    } catch (err) {
+      showToast(`Error al eliminar: ${err.message}`, 'error');
     }
-
-    fetchTasks();
-  } catch (err) {
-    showToast(`Error al eliminar: ${err.message}`, 'error');
-  }
+  });
 };
 
 function updateNotifBtn() {
@@ -971,9 +1047,18 @@ function updateNotifBtn() {
   renderIcons();
 }
 
+function restoreNotifState() {
+  const saved = localStorage.getItem(NOTIF_ENABLED_KEY);
+  if (saved === 'true' && 'Notification' in window && Notification.permission === 'granted') {
+    notificationsEnabled = true;
+  }
+  updateNotifBtn();
+}
+
 async function requestNotificationPermission() {
   if (notificationsEnabled) {
     notificationsEnabled = false;
+    localStorage.setItem(NOTIF_ENABLED_KEY, 'false');
     updateNotifBtn();
     return;
   }
@@ -990,6 +1075,7 @@ async function requestNotificationPermission() {
 
   if (Notification.permission === 'granted') {
     notificationsEnabled = true;
+    localStorage.setItem(NOTIF_ENABLED_KEY, 'true');
     updateNotifBtn();
     return;
   }
@@ -997,24 +1083,36 @@ async function requestNotificationPermission() {
   const permission = await Notification.requestPermission();
   if (permission === 'granted') {
     notificationsEnabled = true;
+    localStorage.setItem(NOTIF_ENABLED_KEY, 'true');
     updateNotifBtn();
   }
 }
 
-function sendNativeNotification(titulo, tareaId) {
+function sendNativeNotification(tarea) {
   if (!notificationsEnabled || !('Notification' in window) || Notification.permission !== 'granted') return;
-  if (notifiedTasks.has(tareaId)) return;
+  if (isTaskNotified(tarea.id)) return;
 
-  notifiedTasks.add(tareaId);
+  markTaskAsNotified(tarea.id);
+
+  const esCritico = tarea.alarma.nivel === '¡MÁXIMO PELIGRO (CRÍTICO)!';
+  const title = `Acción requerida: ${tarea.titulo}`;
+  const body = esCritico
+    ? 'La Falsa Fecha Límite ha vencido. Completa la tarea cuanto antes.'
+    : 'Queda menos de 1 hora para la Falsa Fecha Límite.';
 
   try {
-    const notif = new Notification('Alarma Anti-Procrastinación', {
-      body: titulo,
-      icon: '/icons/icon-192.svg',
+    const notif = new Notification(title, {
+      body,
+      icon: '/icons/icon-512.svg',
       badge: '/icons/icon-192.svg',
-      tag: `critico-${tareaId}`,
+      tag: `critico-${tarea.id}`,
+      data: { tareaId: tarea.id },
       vibrate: [300, 100, 300],
-      requireInteraction: true
+      requireInteraction: true,
+      actions: [
+        { action: 'complete', title: 'Completar' },
+        { action: 'snooze', title: 'Posponer' }
+      ]
     });
 
     notif.addEventListener('click', () => {
@@ -1090,4 +1188,52 @@ function escapeHTML(str) {
       '"': '&quot;'
     }[tag] || tag)
   );
+}
+
+/* ---- CONFIRM MODAL ---- */
+
+function showConfirmModal(message, onConfirm) {
+  const existing = document.querySelector('.confirm-modal-overlay');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.className = 'confirm-modal-overlay';
+
+  overlay.innerHTML = `
+    <div class="confirm-modal">
+      <div class="confirm-modal-icon">${icon('alert-triangle')}</div>
+      <p class="confirm-modal-msg">${escapeHTML(message)}</p>
+      <div class="confirm-modal-actions">
+        <button class="btn btn-cancel" data-action="cancel">Cancelar</button>
+        <button class="btn btn-danger" data-action="confirm">Confirmar</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+
+  requestAnimationFrame(() => {
+    overlay.classList.add('visible');
+    renderIcons();
+  });
+
+  overlay.querySelector('[data-action="cancel"]').addEventListener('click', () => {
+    overlay.classList.remove('visible');
+    overlay.addEventListener('transitionend', () => overlay.remove(), { once: true });
+  });
+
+  overlay.querySelector('[data-action="confirm"]').addEventListener('click', () => {
+    overlay.classList.remove('visible');
+    overlay.addEventListener('transitionend', () => {
+      overlay.remove();
+      onConfirm();
+    }, { once: true });
+  });
+
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) {
+      overlay.classList.remove('visible');
+      overlay.addEventListener('transitionend', () => overlay.remove(), { once: true });
+    }
+  });
 }
