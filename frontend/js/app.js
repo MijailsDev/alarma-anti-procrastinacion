@@ -725,7 +725,7 @@ function renderActiveCard(tarea) {
         </div>
       </div>
       <p class="task-desc">${escapeHTML(tarea.descripcion || 'Sin descripción.')}</p>
-      <div class="task-dates">
+      <div class="task-dates info-panel">
         <div class="date-block">
           <strong>FFL</strong>
           <span class="ffl-primary">${formatRelativeDate(tarea.fecha_limite_falsa)}</span>
@@ -738,11 +738,11 @@ function renderActiveCard(tarea) {
           </span>
         </div>
       </div>
-      <div id="countdown-${tarea.id}" class="task-countdown" data-ffl="${tarea.fecha_limite_falsa}">
+      <div id="countdown-${tarea.id}" class="task-countdown info-panel" data-ffl="${tarea.fecha_limite_falsa}">
         <span class="countdown-icon">${renderCountdownIcon(tarea.id, tarea.fecha_limite_falsa)}</span>
         <span class="countdown-text">${renderCountdownText(tarea.fecha_limite_falsa)}</span>
       </div>
-      <div class="task-alarm-info ${alarmClass}">
+      <div class="task-alarm-info info-panel ${alarmClass}">
         <span>${alertLabel}</span>
       </div>
       <div class="task-actions">
@@ -819,7 +819,7 @@ function renderCompletedCard(tarea) {
         </div>
       </div>
       <p class="task-desc">${escapeHTML(tarea.descripcion || 'Sin descripción.')}</p>
-      <div class="task-dates">
+      <div class="task-dates info-panel">
         <div class="date-block">
           <strong>FFL</strong>
           <span class="ffl-primary">${formatRelativeDate(tarea.fecha_limite_falsa)}</span>

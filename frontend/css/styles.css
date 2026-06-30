@@ -789,6 +789,33 @@ body {
   }
 }
 
+/* === INFO PANEL (datos, no accion) === */
+
+.info-panel {
+  cursor: default;
+  border: 1px solid transparent;
+  background-color: var(--bg-elevated);
+}
+
+.info-panel:hover {
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.task-dates.info-panel {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-card);
+}
+
+.task-countdown.info-panel {
+  background: color-mix(in srgb, var(--bg-elevated) 95%, transparent);
+  border: 1px solid transparent;
+}
+
+.task-alarm-info.info-panel {
+  border: 1px solid transparent;
+}
+
 .task-actions {
   display: flex;
   gap: 10px;
@@ -797,12 +824,12 @@ body {
 
 .btn-action {
   flex: 1;
-  padding: 8px 12px;
-  border-radius: 6px;
-  font-size: 0.8rem;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 0.85rem;
   font-weight: 700;
   cursor: pointer;
-  border: none;
+  border: 1px solid;
   font-family: inherit;
   transition: all 0.2s;
   display: flex;
@@ -814,25 +841,27 @@ body {
 .btn-start {
   background-color: rgba(125, 207, 255, 0.1);
   color: var(--accent-cyan);
-  border: 1px solid rgba(125, 207, 255, 0.25);
+  border-color: rgba(125, 207, 255, 0.25);
 }
 
 .btn-start:hover {
   background-color: var(--accent-cyan);
   color: #1a1b26;
   box-shadow: var(--glow-effect);
+  border-color: var(--accent-cyan);
 }
 
 .btn-submit-task {
   background-color: rgba(187, 154, 247, 0.1);
   color: var(--accent-magenta);
-  border: 1px solid rgba(187, 154, 247, 0.25);
+  border-color: rgba(187, 154, 247, 0.25);
 }
 
 .btn-submit-task:hover {
   background-color: var(--accent-magenta);
   color: var(--text-inverse);
   box-shadow: var(--glow-magenta);
+  border-color: var(--accent-magenta);
 }
 
 .config-section {
