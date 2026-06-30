@@ -1,5 +1,5 @@
 const CONFIG = {
-  API_BASE: 'http://localhost:3000/api'
+  API_BASE: window.electronAPI?.apiBase || 'http://localhost:3000/api'
 };
 
 export default CONFIG;

@@ -19,3 +19,9 @@ backup_rescate.sql
 *.db-journal
 *.db-wal
 *.db-shm
+
+# Electron build output
+release/
+
+# Electron user data (local dev)
+userdata/

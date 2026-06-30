@@ -555,6 +555,7 @@ function stopCountdown() {
 }
 
 async function registerServiceWorker() {
+  if (window.electronAPI) return;
   if ('serviceWorker' in navigator) {
     try {
       const reg = await navigator.serviceWorker.register('/sw.js');

@@ -1,0 +1,35 @@
+appId: com.alarma.anti-procrastinacion
+productName: Alarma Anti-Procrastinación
+directories:
+  output: release
+asar: false
+
+files:
+  - electron
+  - package.json
+
+extraResources:
+  - from: backend
+    to: backend
+    filter:
+      - "**/*"
+      - "!node_modules/**"
+  - from: database
+    to: database
+  - from: frontend
+    to: frontend
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: frontend/icons/icon-512.svg
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  perMachine: false
+  installerIcon: frontend/icons/icon-512.svg
+  uninstallerIcon: frontend/icons/icon-512.svg
+  shortcutName: Alarma Anti-Procrastinación

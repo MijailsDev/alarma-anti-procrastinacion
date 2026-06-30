@@ -451,6 +451,13 @@ setInterval(() => {
   }
 }, 15000);
 
+process.on('exit', () => {
+  if (db && db.open) {
+    try { db.close(); } catch {}
+  }
+});
+
 app.listen(PORT, () => {
   logger.info({ port: PORT }, 'Servidor de Alarma Anti-Procrastinacion iniciado');
+  logger.info({ db: DB_PATH, mode: process.env.NODE_ENV }, 'Backend listo');
 });
