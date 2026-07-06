@@ -9,35 +9,37 @@ Sistema de alerta y gestion estricta de plazos academicos con Falsa Fecha Limite
 El frontend Vanilla JS se sirve como PWA en el navegador **o** como ventana nativa de Electron. El backend Express con SQLite corre embebido dentro de la aplicacion de escritorio (sin necesidad de Docker ni servidor externo).
 
 ```
-                           ┌───────────────────────────┐
+                            ┌───────────────────────────┐
  MODO NAVEGADOR            │  python3 -m http.server   │
  (PWA + Docker)            │  http://localhost:5000     │
-                           └──────────┬────────────────┘
-                                      │
+                            └──────────┬────────────────┘
+                                       │
  MODO ESCRITORIO           ┌──────────┴────────────────┐
  (Electron autocontenido) │  electron/main.js          │
-                           │  ┌─ preload.js (contextBridge)
-                           │  └─ BrowserWindow.loadFile()│
-                           └──────────┬────────────────┘
-                                      │
-                          ┌───────────┴────────────┐
-                          │   Express REST API      │
-                          │   Puerto aleatorio      │
-                          │   Spawneado por Electron│
-                          └───────────┬────────────┘
-                                      │
-                          ┌───────────┴────────────┐
-                          │  SQLite (better-sqlite3)│
-                          │  %APPDATA%/alarma.db    │
-                          └────────────────────────┘
+                            │  ┌─ preload.js (contextBridge)
+                            │  └─ BrowserWindow.loadFile()│
+                            │  └─ import() dinamico con  │
+                            │     pathToFileURL()        │
+                            └──────────┬────────────────┘
+                                       │
+                           ┌───────────┴────────────┐
+                           │   Express REST API      │
+                           │   Puerto aleatorio      │
+                           │   Cargado via import()  │
+                           └───────────┬────────────┘
+                                       │
+                           ┌───────────┴────────────┐
+                           │  SQLite (sql.js WASM)  │
+                           │  %APPDATA%/alarma.db    │
+                           └────────────────────────┘
 ```
 
 ### Componentes
 
-- **Backend:** Node.js (ESM), Express, better-sqlite3, JWT, bcrypt, Zod, Pino logger
+- **Backend:** Node.js (ESM), Express, sql.js (SQLite WASM), JWT, bcrypt, Zod, Pino v8 logger
 - **Frontend:** HTML5, CSS3, Vanilla JS (modulos ES), Web Audio API, Lucide icons
-- **Escritorio:** Electron 28, contex-isolation, contextBridge
-- **Base de datos:** SQLite con WAL, creada en `%APPDATA%/alarma-anti-procrastinacion/alarma.db` (Windows) o `~/.config/alarma-anti-procrastinacion/alarma.db` (Linux)
+- **Escritorio:** Electron 28, context-isolation, contextBridge
+- **Base de datos:** SQLite via sql.js, creada en `%APPDATA%/alarma-anti-procrastinacion/alarma.db` (Windows) o `~/.config/alarma-anti-procrastinacion/alarma.db` (Linux)
 
 ---
 
@@ -85,6 +87,10 @@ npm run dev
 npm run build:win
 ```
 
+El script `scripts/build.js` ejecuta automaticamente:
+1. Instala solo dependencias de produccion del backend (`npm install --production` en `backend/`)
+2. Compila el instalador NSIS via `electron-builder`
+
 **Requisito:** En Linux, instalar `wine` para compilar el instalador NSIS:
 
 ```bash
@@ -92,6 +98,13 @@ sudo apt install wine
 ```
 
 El instalador `.exe` se genera en `release/`. La base de datos se guarda automaticamente en `%APPDATA%/alarma-anti-procrastinacion/alarma.db` — sin problemas de permisos de escritura para el usuario.
+
+### Notas sobre el empaquetado
+
+- `asar: false` — los archivos se copian sin comprimir
+- El backend se incluye como `extraResources` con su propio `node_modules` (produccion)
+- Las rutas en produccion se resuelven via `process.resourcesPath`
+- El `import()` dinamico del backend usa `pathToFileURL()` para compatibilidad con Windows
 
 ---
 
@@ -154,8 +167,12 @@ El boton **Silenciar** detiene la alarma por 3 minutos. Pasado ese tiempo, si la
 │   │   └── formatDate.js
 │   ├── icons/
 │   └── sw.js
+├── scripts/
+│   ├── build.js            # Orquestador de build (iconos + deps + electron-builder)
+│   ├── build.sh            # Alternativa bash
+│   └── generate-icons.py   # Generador de iconos PNG
 ├── docker-compose.yml
-├── electron-builder.yml
+├── electron-builder.yml    # Configuracion de empaquetado
 └── package.json            # Raiz: Electron + backend deps
 ```
 
