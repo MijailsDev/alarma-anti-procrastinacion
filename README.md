@@ -9,7 +9,24 @@ Sistema de alerta y gestion estricta de plazos academicos con Falsa Fecha Limite
 ## Capturas
 
 ![Pantalla principal](frontend/screenshots/main.png)
+
 ![Alarma critica](frontend/screenshots/alerta-roja.png)
+
+---
+
+## Guia de Uso
+
+![Login](frontend/screenshots/login.png)
+
+**Registro e Inicio de Sesion:** Al abrir la aplicacion por primera vez, crea una cuenta local e inicia sesion para gestionar tus pendientes.
+
+**Registrar una tarea:** Anade tu laboratorio, proyecto o tarea pendiente colocando unicamente la Fecha Limite Real.
+
+**Dejar en ejecucion:** El sistema calculara automaticamente tu "Falsa Fecha Limite" (FFL) restando tu margen de seguridad. No es necesario hacer nada mas, la aplicacion monitoreara el tiempo en segundo plano.
+
+**Atender las alarmas:** A medida que se acerque tu FFL, la aplicacion emitira alertas visuales y sonoras progresivas.
+
+**Completar la tarea:** Una vez termines tu trabajo, cambia el estado de la tarea a "Enviada" para detener las alarmas por completo.
 
 ---
 
