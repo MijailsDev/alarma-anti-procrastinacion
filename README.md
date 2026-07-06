@@ -2,6 +2,15 @@
 
 Sistema de alerta y gestion estricta de plazos academicos con Falsa Fecha Limite (FFL), maquina de estados rigurosa y alarmas sonoras progresivas. Combate la postergacion cronica en la entrega de laboratorios y tareas.
 
+[![Descargar para Windows](https://img.shields.io/badge/Descargar%20.exe-v1.0.0-blue?style=for-the-badge&logo=windows11)](https://github.com/MijailsDev/alarma-anti-procrastinacion/releases/tag/v1.0.0.0)
+
+---
+
+## Capturas
+
+![Pantalla principal](frontend/screenshots/main.png)
+![Alarma critica](frontend/screenshots/alerta-roja.png)
+
 ---
 
 ## 1. Arquitectura
@@ -192,3 +201,13 @@ rm -f "%APPDATA%/alarma-anti-procrastinacion/alarma.db" # Windows
 docker compose logs -f
 docker compose down
 ```
+
+---
+
+## Autor
+
+**Mijail** — [mquispeq@unamad.edu.pe](mailto:mquispeq@unamad.edu.pe)
+
+## Licencia
+
+MIT © 2026. Ver [LICENSE](LICENSE.txt).
