@@ -1,16 +1,37 @@
 import pino from 'pino';
 import { randomUUID } from 'crypto';
+import path from 'path';
+import fs from 'fs';
 
 const isDev = process.env.NODE_ENV !== 'production';
 
+const targets = [];
+
+if (isDev) {
+  targets.push({
+    target: 'pino-pretty',
+    options: { colorize: true, translateTime: 'HH:MM:ss.l' }
+  });
+} else {
+  const logDir = process.env.LOG_DIR || (
+    process.env.DB_PATH
+      ? path.dirname(process.env.DB_PATH)
+      : '.'
+  );
+  if (!fs.existsSync(logDir)) {
+    fs.mkdirSync(logDir, { recursive: true });
+  }
+  targets.push({
+    target: 'pino/file',
+    options: { destination: path.join(logDir, 'alarma.log'), mkdir: true }
+  });
+}
+
 const logger = pino({
   level: process.env.LOG_LEVEL || (isDev ? 'debug' : 'info'),
-  ...(isDev && {
-    transport: {
-      target: 'pino-pretty',
-      options: { colorize: true, translateTime: 'HH:MM:ss.l' }
-    }
-  }),
+  ...(targets.length === 1
+    ? { transport: targets[0] }
+    : { transport: { targets } }),
   redact: {
     paths: ['req.headers.authorization', 'body.password', 'body.refreshToken'],
     censor: '[REDACTED]'

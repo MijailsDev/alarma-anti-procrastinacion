@@ -1,151 +1,177 @@
-# ⏱️ Alarma Anti-Procrastinación
+# Alarma Anti-Procrastinacion
 
-Documentación técnica oficial y manual de usuario para el sistema inteligente de alerta y gestión estricta de plazos académicos. Adaptado con lógica rigurosa y blindaje contra la postergación crónica para estudiantes de la **Universidad Nacional Amazónica de Madre de Dios (UNAMAD)**, en particular para la carrera de **Ingeniería de Sistemas**.
-
----
-
-## 📖 1. Descripción General
-
-La **Alarma Anti-Procrastinación** es una herramienta de software diseñada para mitigar y combatir la postergación crónica en la entrega de laboratorios, proyectos y tareas del aula virtual. A diferencia de las agendas tradicionales que confían en la buena voluntad del usuario, este sistema asume que el estudiante tenderá a postergar la entrega hasta el último minuto y, por ende, aplica reglas de negocio automatizadas e implacables para romper el ciclo del sueño o la inacción.
-
-La solución combina un cálculo automatizado de plazos simulados, una máquina de estados estricta y un monitor de alarmas sonoras e interactivas que intensifican su molestia a medida que el plazo ficticio expira.
+Sistema de alerta y gestion estricta de plazos academicos con Falsa Fecha Limite (FFL), maquina de estados rigurosa y alarmas sonoras progresivas. Combate la postergacion cronica en la entrega de laboratorios y tareas.
 
 ---
 
-## 🏗️ 2. Arquitectura de Software
+## 1. Arquitectura
 
-El sistema utiliza una arquitectura desacoplada: backend Node.js/Express con SQLite, frontend PWA. Puede ejecutarse con Docker o localmente sin dependencia de servidor de base de datos externo.
+El frontend Vanilla JS se sirve como PWA en el navegador **o** como ventana nativa de Electron. El backend Express con SQLite corre embebido dentro de la aplicacion de escritorio (sin necesidad de Docker ni servidor externo).
 
 ```
- ┌─────────────────────────────────────────────────────────┐
- │                      FRONTEND PWA                       │
- │      HTML5 / CSS3 (Estroboscópico) / Vanilla JS         │
- │      Web Audio API (Generador de onda sawtooth)         │
- └───────────────────────────┬─────────────────────────────┘
-                             │
-                             │ (Peticiones HTTP REST / JSON)
-                             ▼
- ┌─────────────────────────────────────────────────────────┐
- │                   BACKEND (Express API)                 │
- │            Módulos ESM (Node.js 18-Alpine)              │
- │          Worker ligero de escaneo en background         │
- └───────────────────────────┬─────────────────────────────┘
-                             │
-                              │ (better-sqlite3)
-                              ▼
- ┌─────────────────────────────────────────────────────────┐
- │              BASE DE DATOS (SQLite 3 / WAL)             │
- │                Esquema relacional estricto              │
- └─────────────────────────────────────────────────────────┘
+                           ┌───────────────────────────┐
+ MODO NAVEGADOR            │  python3 -m http.server   │
+ (PWA + Docker)            │  http://localhost:5000     │
+                           └──────────┬────────────────┘
+                                      │
+ MODO ESCRITORIO           ┌──────────┴────────────────┐
+ (Electron autocontenido) │  electron/main.js          │
+                           │  ┌─ preload.js (contextBridge)
+                           │  └─ BrowserWindow.loadFile()│
+                           └──────────┬────────────────┘
+                                      │
+                          ┌───────────┴────────────┐
+                          │   Express REST API      │
+                          │   Puerto aleatorio      │
+                          │   Spawneado por Electron│
+                          └───────────┬────────────┘
+                                      │
+                          ┌───────────┴────────────┐
+                          │  SQLite (better-sqlite3)│
+                          │  %APPDATA%/alarma.db    │
+                          └────────────────────────┘
 ```
 
-### Componentes y Puertos Configurados
+### Componentes
 
-1. **Base de Datos (SQLite 3 con modo WAL):**
-   - **Archivo de base de datos:** `backend/data/alarma.db` (creado automáticamente al arrancar el backend)
-   - **Características:** Sin servidor, sin configuración de usuario/contraseña. Esquema inicializado automáticamente desde `database/schema.sql` en cada arranque. Persistencia mediante el volumen Docker `db_data:/usr/src/app/data`.
-
-2. **Backend (Node.js 18-Alpine & Express):**
-   - **Servicio Docker:** `app`
-   - **Puerto de Escucha:** `3000` (Expuesto y mapeado `3000:3000`)
-   - **Características:** Uso nativo de Módulos de JavaScript (`"type": "module"`), recarga en vivo durante el desarrollo mediante `nodemon`, acceso síncrono a SQLite mediante `better-sqlite3` y un micro-worker interno (`setInterval`) que monitorea y alerta sobre tareas procrastinadas cada 15 segundos en la consola del servidor.
-
-3. **Frontend PWA (Cliente Estático):**
-   - **Puerto de Servicio:** `5000` (Levantado mediante servidor local ultra-ligero)
-   - **Características:** Estructura limpia de Progressive Web App (PWA) con Service Worker (`sw.js`) listo para caché sin conexión y gestión de eventos Push. Emplea la **Web Audio API** para generar de manera nativa y directa en el navegador un tono de alarma agresivo de onda de sierra (`sawtooth`) sin necesidad de depender de archivos de audio externos.
+- **Backend:** Node.js (ESM), Express, better-sqlite3, JWT, bcrypt, Zod, Pino logger
+- **Frontend:** HTML5, CSS3, Vanilla JS (modulos ES), Web Audio API, Lucide icons
+- **Escritorio:** Electron 28, contex-isolation, contextBridge
+- **Base de datos:** SQLite con WAL, creada en `%APPDATA%/alarma-anti-procrastinacion/alarma.db` (Windows) o `~/.config/alarma-anti-procrastinacion/alarma.db` (Linux)
 
 ---
 
-## 🚀 3. Guía de Inicialización Paso a Paso
+## 2. Guia de Inicializacion
 
-Sigue las siguientes instrucciones dentro de tu entorno **WSL (Ubuntu)** en Windows 11 para levantar los servicios desde cero:
+### 2a. Aplicacion de escritorio (Electron) — RECOMENDADO
 
-### Paso 1: Iniciar el Backend (Docker)
 ```bash
-cd /home/caffe/proyectos/alarma-anti-procrastinacion
+# Instalar dependencias (backend + Electron)
+npm install
+
+# Iniciar en modo desarrollo
+npm start
+```
+
+Esto arranca:
+1. El backend Express en un puerto libre aleatorio (spawneado por Electron)
+2. La ventana nativa de Electron cargando `frontend/index.html`
+
+### 2b. Modo PWA + Docker (alternativa)
+
+```bash
+# Backend con Docker
 docker compose up -d
-```
-*Para verificar que el contenedor está corriendo:*
-```bash
-docker compose ps
+
+# Servir frontend estatico
+python3 -m http.server 5000 --directory ./frontend
 ```
 
-### Paso 1b: Iniciar el Backend (Local, sin Docker)
+Abrir `http://localhost:5000` en el navegador.
+
+### 2c. Solo backend (para desarrollo de API)
+
 ```bash
-cd /home/caffe/proyectos/alarma-anti-procrastinacion/backend
-cp .env.example .env
+cd backend
 npm install
 npm run dev
 ```
 
-### Paso 2: Servir el Frontend
-Para evitar problemas de CORS y asegurar el correcto registro del Service Worker de la PWA, sirve los archivos estáticos desde un servidor web local. Ejecuta el servidor integrado de Python desde la raíz del frontend en el puerto `5000`:
+---
+
+## 3. Build para Windows
+
 ```bash
-python3 -m http.server 5000 --directory ./frontend
+npm run build:win
 ```
-Ahora, abre tu navegador web preferido e ingresa a: **`http://localhost:5000`**
 
-### Paso 3: Activación Crítica de Permisos de Audio 🔊
-> ⚠️ **NOTA CRÍTICA DE USABILIDAD:** Los navegadores web modernos (Chrome, Edge, Firefox) bloquean la reproducción de audio automática hasta que el usuario interactúe con el documento. 
-> 
-> **Debes hacer clic en cualquier parte de la pantalla** una vez que cargue la interfaz. Esto inicializará el `AudioContext` de la Web Audio API y garantizará que los tonos de alarma de pánico se escuchen de manera inmediata.
+**Requisito:** En Linux, instalar `wine` para compilar el instalador NSIS:
 
----
-
-## 🧠 4. Reglas de Negocio ("Modo Pro")
-
-Este software no es un gestor de tareas tradicional; está diseñado bajo un modelo de disciplina digital estricta:
-
-### A. Falsa Fecha Límite (FFL) Automatizada
-Cuando registras una tarea ingresando su fecha y hora límite real de entrega (la que indica el aula virtual de la UNAMAD), el backend intercepta el valor, consulta el margen de amortiguación del perfil del usuario (configurable, por defecto **5 horas**) y calcula de forma automática la **Falsa Fecha Límite (FFL)**:
-
-$$\text{FFL} = \text{Fecha Límite Real} - 5\text{ horas}$$
-
-Toda la interfaz del estudiante, las alertas, las cuentas regresivas y el zumbido de alarma se regirán **estrictamente bajo esta FFL**. Esto te obliga psicológicamente y operativamente a entregar tu trabajo con 5 horas de anticipación real, dándote un colchón de seguridad invaluable en caso de imprevistos técnicos o cansancio.
-
-### B. Máquina de Estados Estricta
-El ciclo de vida de una tarea es unidireccional y riguroso. Los estados permitidos son:
-1. `Pendiente` (Al registrar la tarea)
-2. `En Progreso` (Cuando el estudiante empieza activamente a trabajar en ella)
-3. `Enviada` (Entrega confirmada y subida al aula virtual)
-
-**Regla de Transición Inflexible:** No se permiten saltos de estados inválidos (por ejemplo, intentar pasar una tarea de `Pendiente` a `Enviada` sin pasar por `En Progreso`, o intentar volver una tarea ya entregada a un estado anterior). Si intentas realizar una transición fuera de la secuencia `Pendiente ➔ En Progreso ➔ Enviada`, el backend rechazará la transacción mediante código de error `400` y desplegará una alerta explicativa.
-
-### C. Alertas y Alarmas en Cascada (Modo de Pánico Máximo)
-El sistema evalúa continuamente en tiempo real el tiempo restante para alcanzar la FFL y calcula la gravedad del recordatorio:
-
-| Tiempo Restante para la FFL | Nivel de Alerta | Comportamiento del Frontend | Frecuencia de Alarma |
-| :--- | :--- | :--- | :--- |
-| **Más de 5 horas** | `Bajo` | Tarjeta en verde. Recordatorio pasivo. | Sin sonido activo |
-| **Entre 1 y 5 horas** | `Moderado` | Tarjeta en amarillo. Advertencia persistente. | Tono suave cada 10 segundos |
-| **Menos de 1 hora** | `Alto (Crítico)` | Tarjeta en naranja. Urgencia evidente. | Pitido intermitente cada 2.5 segundos |
-| **FFL Superada y no Enviada** | `¡MÁXIMO PELIGRO!` | **Modo Pánico:** CSS estroboscópico parpadeante en pantalla. | **Buzzer continuo cada 0.8 segundos (sawtooth)** |
-
-*El zumbador de pánico solo se apagará definitivamente cuando el estudiante actualice el estado de la tarea a **`Enviada`**.*
-*Se incluye un botón de **Silencio Temporal** que detiene el pitido por **3 minutos** para permitir al usuario concentrarse en la entrega final. Si el estado no cambia a 'Enviada' al expirar el tiempo, el pitido agresivo regresará.*
-
----
-
-## 🛠️ 5. Comandos de Mantenimiento y Diagnóstico
-
-### Ver logs en tiempo real del ecosistema Docker
-Permite inspeccionar lo que sucede en el backend, las peticiones entrantes y la salida por consola del worker de monitoreo de alarmas:
 ```bash
+sudo apt install wine
+```
+
+El instalador `.exe` se genera en `release/`. La base de datos se guarda automaticamente en `%APPDATA%/alarma-anti-procrastinacion/alarma.db` — sin problemas de permisos de escritura para el usuario.
+
+---
+
+## 4. Reglas de Negocio
+
+### A. Falsa Fecha Limite (FFL) Automatizada
+
+Al registrar una tarea con su fecha limite real, el backend consulta el margen de amortiguacion del perfil (defecto: **5 horas**) y calcula:
+
+```
+FFL = Fecha Limite Real - margen_horas
+```
+
+Toda la interfaz, las alertas y las alarmas se rigen bajo esta FFL, forzando al estudiante a entregar con anticipacion real.
+
+### B. Maquina de Estados Estricta
+
+```
+Pendiente  →  En Progreso  →  Enviada
+```
+
+Las transiciones son unidireccionales. No se permite saltar estados ni retroceder. Cualquier transicion invalida devuelve error `400`.
+
+### C. Niveles de Alarma
+
+| Tiempo restante para FFL | Nivel | Color | Frecuencia de alarma |
+|---|---|---|---|
+| > 5 h | Bajo | Verde | Sin sonido |
+| 1-5 h | Moderado | Amarillo | Tono cada 10 s |
+| < 1 h | Alto (Critico) | Naranja | Pitido cada 2.5 s |
+| FFL vencida | MAXIMO PELIGRO | Rojo estroboscopico | Buzzer cada 0.8 s |
+
+El boton **Silenciar** detiene la alarma por 3 minutos. Pasado ese tiempo, si la tarea sigue sin entregarse, la alarma se reactiva.
+
+---
+
+## 5. Estructura del Proyecto
+
+```
+├── electron/
+│   ├── main.js            # Proceso principal de Electron
+│   └── preload.js         # contextBridge (expone API_BASE al renderer)
+├── backend/
+│   ├── index.js           # Servidor Express
+│   ├── src/
+│   │   ├── errors.js
+│   │   ├── logger.js
+│   │   ├── logic.js
+│   │   ├── validate.js
+│   │   └── __tests__/
+│   └── package.json
+├── database/
+│   └── schema.sql
+├── frontend/
+│   ├── index.html
+│   ├── css/styles.css
+│   ├── js/
+│   │   ├── app.js
+│   │   ├── config.js
+│   │   └── formatDate.js
+│   ├── icons/
+│   └── sw.js
+├── docker-compose.yml
+├── electron-builder.yml
+└── package.json            # Raiz: Electron + backend deps
+```
+
+---
+
+## 6. Comandos de Mantenimiento
+
+```bash
+# Resetear base de datos local
+rm -f ~/.config/alarma-anti-procrastinacion/alarma.db   # Linux
+rm -f "%APPDATA%/alarma-anti-procrastinacion/alarma.db" # Windows
+
+# Ver logs del backend (modo Electron)
+# Los logs aparecen en la consola donde se ejecuto npm start
+
+# Docker (modo PWA)
 docker compose logs -f
-```
-
-### Resetear / Limpiar por completo la tabla de tareas
-```bash
-# Con Docker:
-docker compose exec app rm -f /usr/src/app/data/alarma.db
-# Sin Docker (local):
-rm -f backend/data/alarma.db
-# Al reiniciar el backend, SQLite recreará el archivo con las tablas vacías automáticamente.
-```
-
-### Apagar los servicios de Docker liberando recursos
-Cuando no estés estudiando y desees detener el entorno de desarrollo por completo:
-```bash
 docker compose down
 ```
-*(Los datos de la base de datos se mantendrán seguros e intactos gracias al volumen persistente `db_data`). Para borrar los datos por completo: `docker compose down -v`.*
